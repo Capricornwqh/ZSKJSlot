@@ -1,0 +1,16 @@
+# gs設定檔
+
+ServerID = 1
+CmdPath = "GsCmd"
+TimeZone = "Local"
+ServerPort = 10001
+Release = false
+ReadBufferSize = 10000
+WriteBufferSize = 10000
+ClientMax = 10000
+ClientIdleTime = 15
+
+[nats]
+Host = "10.11.13.13"
+Port = 4222
+Token = "7d9431ae8975"
