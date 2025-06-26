@@ -50,6 +50,7 @@ func TestRTPVerifierRun(t *testing.T) {
 			p.Printf("Test %s %d次 耗时: %d时%d分%d秒\n",
 				tt.name, tt.rv.TotalCount, hours, minutes, seconds)
 			tt.rv.Dump(true)
+			p.Println("========================================")
 		})
 	}
 }

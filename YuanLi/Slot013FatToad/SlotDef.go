@@ -41,6 +41,7 @@ type SlotResult struct {
 	SSCount      int           `json:"-"`        // 铜钱数量
 	WWLevel      int           `json:"-"`        // 金蟾等级
 	WWMultiplier int           `json:"-"`        // 金蟾乘倍
+	SpecialSpin  bool          `json:"-"`        // 特殊 Spin
 }
 
 // SpinResult 玩家 Spin 一次的結果 (與 MGResult 不同！)
@@ -60,10 +61,12 @@ type SpinResult struct {
 
 // MGResult 主遊戲結果
 type MGResult struct {
-	MGGroupIndex int             `json:"MGGroupIndex"` // 主遊戲初始盤面轉輪群組 index
-	MGTumbleList []*TumbleResult `json:"MGTumbleList"` // 主遊戲盤面列表
-	MainWin      uint64          `json:"MainWin"`      // 主遊戲贏分
-	FreeGameType int             `json:"FreeGameType"` // 免費遊戲類型 (即免費遊戲的轉輪群組 index)
+	MGGroupIndex   int             `json:"MGGroupIndex"` // 主遊戲初始盤面轉輪群組 index
+	MGTumbleList   []*TumbleResult `json:"MGTumbleList"` // 主遊戲盤面列表
+	MainWin        uint64          `json:"MainWin"`      // 主遊戲贏分
+	FreeGameType   int             `json:"FreeGameType"` // 免費遊戲類型 (即免費遊戲的轉輪群組 index)
+	MGFeatureWin   uint64          `json:"MGFeatureWin"` // 主遊戲天降贏分
+	MGFeatureCount int             `json:"-"`            // 天降次數
 }
 
 // FGResult 免費遊戲結果
@@ -74,6 +77,8 @@ type FGResult struct {
 	FGMultiplier   int           `json:"FGMultiplier"`   // 免費遊戲乘倍
 	FGIndex        int           `json:"-"`              // 免費遊戲配套index
 	FreeWin        uint64        `json:"FreeWin"`        // 免費遊戲贏分
+	FGFeatureWin   uint64        `json:"FGFeatureWin"`   // 免費遊戲天降贏分
+	FGFeatureCount int           `json:"-"`              // 天降次數
 }
 
 // DebugCmd 測試指令

@@ -4,9 +4,11 @@ import (
 	"Force/GameServer/Common"
 	"Force/GameServer/Utils"
 	"fmt"
+	"math"
 	"math/rand/v2"
 	"os"
 	"slices"
+	"sort"
 )
 
 type WildStruct struct {
@@ -36,14 +38,6 @@ func (slot *SlotProb) SetRTPRoulette() {
 			rouletteMap[buyType] = *roulette
 		}
 		slot.MGReelGroupRouletteMaps[rtp] = rouletteMap
-
-		// 免費遊戲轉輪群組 Roulette Map
-		rouletteMap = make(map[int]Utils.Roulette[int])
-		for buyType, groupWT := range FGReelGroupWT[rtp] {
-			roulette := Utils.NewRouletteFromList(groupWT)
-			rouletteMap[buyType] = *roulette
-		}
-		slot.FGReelGroupRouletteMaps[rtp] = rouletteMap
 	}
 }
 
@@ -69,9 +63,10 @@ func (slot *SlotProb) Run(rtp int, lineBet int, result *SlotResult, debugCmdList
 	result.MainWin += tumbleResult.Win
 	result.MGTumbleList = append(result.MGTumbleList, tumbleResult)
 
-	// 如果赢分=0 和 free 不触发，触发天降横财
-	if buyType == Common.BUY_NONE && result.MainWin <= 0 && (len(result.SSWild) <= 0 || len(result.WWWild) <= 0) &&
+	// 如果赢分=0 且没有金蟾，触发天降横财
+	if buyType == Common.BUY_NONE && result.MainWin <= 0 && len(result.WWWild) <= 0 &&
 		rand.IntN(100) < FEATURE_WILD_MAIN_GAME {
+		result.MGFeatureCount++
 		tumbleResult1 := &TumbleResult{}
 		tumbleSymbol := make(GameSymbol, len(tumbleResult.TumbleSymbol))
 		for i, v := range tumbleResult.TumbleSymbol {
@@ -79,37 +74,40 @@ func (slot *SlotProb) Run(rtp int, lineBet int, result *SlotResult, debugCmdList
 		}
 
 		count := Utils.RandChoiceByWeight(MGFeatureSSList, MGFeatureSSWT)
-		availableCols := make([]int, 0, 5)
+
+		// 随机选择一条中奖线
+		lineIndex := rand.IntN(len(LineIndexArray))
+		selectedLine := LineIndexArray[lineIndex]
+
+		// 收集可放置铜钱的位置（按照中奖线的行位置，排除第1列和有百搭的列）
+		availablePositions := make([][2]int, 0)
 		for col := 1; col < SLOT_COL; col++ {
+			// 检查这一列是否有百搭
 			hasWild := false
-			// 检查该列是否已有铜钱
-			for row := range SLOT_ROW {
-				if isWild(tumbleSymbol[col][row]) {
+			for r := range SLOT_ROW {
+				if isWild(tumbleSymbol[col][r]) {
 					hasWild = true
 					break
 				}
 			}
-			// 如果该列没有铜钱，将列索引添加到可用列列表
+
+			// 如果这一列没有百搭，则可以放置铜钱
 			if !hasWild {
-				availableCols = append(availableCols, col)
+				row := selectedLine[col]
+				availablePositions = append(availablePositions, [2]int{col, row})
 			}
 		}
 
-		// 随机打乱可用列的顺序
-		rand.Shuffle(len(availableCols), func(i, j int) {
-			availableCols[i], availableCols[j] = availableCols[j], availableCols[i]
-		})
+		// 选择不超过count个位置来放置铜钱
+		coinCount := min(int(count), len(availablePositions))
 
-		// 选择不超过count个列来放置铜钱
-		coinCount := min(int(count), len(availableCols))
-
-		// 在每个选定的列中随机选择一行放置铜钱
+		// 在选定的位置上放置铜钱
 		for i := range coinCount {
-			col := availableCols[i]
-			row := rand.IntN(SLOT_ROW)
+			position := availablePositions[i]
+			col, row := position[0], position[1]
 
 			// 放置铜钱
-			tumbleSymbol[col][row] = slot.getMainWildMulti(result.MGGroupIndex)
+			tumbleSymbol[col][row] = slot.getMainWildMulti(result.BuyType, result.MGGroupIndex)
 			result.SSWild = append(result.SSWild, &WildStruct{
 				WildSymbol:     tumbleSymbol[col][row],
 				WildCoordinate: [2]int{col, row},
@@ -123,6 +121,7 @@ func (slot *SlotProb) Run(rtp int, lineBet int, result *SlotResult, debugCmdList
 		tumbleResult1.MGPerformanceType = PERFORMANCE_FEATURE
 		result.MGTumbleList = append(result.MGTumbleList, tumbleResult1)
 		result.MainWin += tumbleResult1.Win
+		result.MGFeatureWin += tumbleResult1.Win
 	}
 
 	// 判斷是否進免費遊戲 (需未達最大贏分)
@@ -146,19 +145,26 @@ func (slot *SlotProb) Run(rtp int, lineBet int, result *SlotResult, debugCmdList
 	result.FreeWin = 0
 	tmpSpinCount := 0
 	switch result.BuyType {
+	case Common.BUY_NONE:
+		result.FGIndex = Utils.RandChoiceByWeight(FGIndexList, FGIndexWT)
 	case Common.BUY_FREE_SPINS:
 		result.FGIndex = Utils.RandChoiceByWeight(FGIndexList, FGBuyFreeIndexWT)
 	case Common.BUY_SUPER_FREE_SPINS:
 		result.FGIndex = Utils.RandChoiceByWeight(FGIndexList, FGBuySuperIndexWT)
 	default:
-		result.FGIndex = Utils.RandChoiceByWeight(FGIndexList, FGIndexWT)
 	}
+	tmpSpeicalSpin := rand.IntN(5) + 1 // 特殊 Spin
 
-	// 免費遊戲相關處理 (需未達最大贏分)
+	// 免費遊戲相關處理(需未達最大贏分)
 	for result.FGSpinCount > 0 {
 		result.GameMode = Common.GAME_MODE_FREE
 		result.FGSpinCount--
 		tmpSpinCount++
+		if tmpSpinCount == tmpSpeicalSpin {
+			result.SpecialSpin = true
+		} else {
+			result.SpecialSpin = false
+		}
 		tmpFreeWin := slot.RunFreeGame(rtp, lineBet, tmpSpinCount, result, debugCmdList)
 		if result.TotalWin+tmpFreeWin >= maxWin {
 			tmpFreeWin = maxWin - result.TotalWin
@@ -204,14 +210,6 @@ func (slot *SlotProb) Run(rtp int, lineBet int, result *SlotResult, debugCmdList
 					} else if result.WWLevel == 2 {
 						endValue = FEATURE_BUY_NONE_LEVEL2_2
 					}
-				case FREE_INDEX_3:
-					if result.WWLevel == 1 {
-						endValue = FEATURE_BUY_NONE_LEVEL1_3
-					} else if result.WWLevel == 2 {
-						endValue = FEATURE_BUY_NONE_LEVEL2_3
-					} else if result.WWLevel == 3 {
-						endValue = FEATURE_BUY_NONE_LEVEL3_3
-					}
 				default:
 				}
 			case Common.BUY_FREE_SPINS:
@@ -221,6 +219,8 @@ func (slot *SlotProb) Run(rtp int, lineBet int, result *SlotResult, debugCmdList
 						endValue = FEATURE_BUY_FREE_LEVEL1_1
 					} else if result.WWLevel == 2 {
 						endValue = FEATURE_BUY_FREE_LEVEL2_1
+					} else if result.WWLevel == 3 {
+						endValue = FEATURE_BUY_FREE_LEVEL3_1
 					}
 				case FREE_INDEX_2:
 					if result.WWLevel == 1 {
@@ -228,37 +228,25 @@ func (slot *SlotProb) Run(rtp int, lineBet int, result *SlotResult, debugCmdList
 					} else if result.WWLevel == 2 {
 						endValue = FEATURE_BUY_FREE_LEVEL2_2
 					}
-				case FREE_INDEX_3:
-					if result.WWLevel == 1 {
-						endValue = FEATURE_BUY_FREE_LEVEL1_3
-					} else if result.WWLevel == 2 {
-						endValue = FEATURE_BUY_FREE_LEVEL2_3
-					}
 				default:
 				}
 			case Common.BUY_SUPER_FREE_SPINS:
 				switch result.FGIndex {
 				case FREE_INDEX_1:
-					if result.WWLevel == 1 {
-						endValue = FEATURE_BUY_SUPER_LEVEL1_1
-					} else if result.WWLevel == 2 {
+					if result.WWLevel == 2 {
 						endValue = FEATURE_BUY_SUPER_LEVEL2_1
+					} else if result.WWLevel == 3 {
+						endValue = FEATURE_BUY_SUPER_LEVEL3_1
+					} else if result.WWLevel == 4 {
+						endValue = FEATURE_BUY_SUPER_LEVEL4_1
 					}
 				case FREE_INDEX_2:
-					if result.WWLevel == 1 {
-						endValue = FEATURE_BUY_SUPER_LEVEL1_2
-					} else if result.WWLevel == 2 {
+					if result.WWLevel == 2 {
 						endValue = FEATURE_BUY_SUPER_LEVEL2_2
 					} else if result.WWLevel == 3 {
 						endValue = FEATURE_BUY_SUPER_LEVEL3_2
-					}
-				case FREE_INDEX_3:
-					if result.WWLevel == 1 {
-						endValue = FEATURE_BUY_SUPER_LEVEL1_3
-					} else if result.WWLevel == 2 {
-						endValue = FEATURE_BUY_SUPER_LEVEL2_3
-					} else if result.WWLevel == 3 {
-						endValue = FEATURE_BUY_SUPER_LEVEL3_3
+					} else if result.WWLevel == 4 {
+						endValue = FEATURE_BUY_SUPER_LEVEL4_2
 					}
 				default:
 				}
@@ -266,6 +254,7 @@ func (slot *SlotProb) Run(rtp int, lineBet int, result *SlotResult, debugCmdList
 			}
 
 			if requiredSSCount <= 2 && endValue > 0 && tmpValue < endValue {
+				result.FGFeatureCount++
 				tumbleSymbol := make(GameSymbol, len(result.FGSpinList[len(result.FGSpinList)-1].TumbleSymbol))
 				for i, v := range result.FGSpinList[len(result.FGSpinList)-1].TumbleSymbol {
 					tumbleSymbol[i] = slices.Clone(v)
@@ -337,15 +326,23 @@ func (slot *SlotProb) Run(rtp int, lineBet int, result *SlotResult, debugCmdList
 }
 
 // 获取主游戏铜钱倍数
-func (slot *SlotProb) getMainWildMulti(index int) Symbol {
-	if index == MAIN_GAME_01 && rand.IntN(100) < SSWILD_MAIN_GAME_1 {
-		return Utils.RandChoiceByWeight(MGSSMultiList, MGSSMultiWT)
-	} else if index == MAIN_GAME_02 && rand.IntN(100) < SSWILD_MAIN_GAME_2 {
-		return Utils.RandChoiceByWeight(MGSSMultiList, MGSSMultiWT)
-	} else if index == MAIN_GAME_FREE && rand.IntN(100) < SSWILD_MAIN_GAME_1 {
-		return Utils.RandChoiceByWeight(MGSSMultiList, MGSSMultiWT)
-	} else if index == MAIN_GAME_SUPER && rand.IntN(100) < SSWILD_BUY_SUPER {
-		return Utils.RandChoiceByWeight(MGSSMultiList, MGSSMultiWT)
+func (slot *SlotProb) getMainWildMulti(buyType, index int) Symbol {
+	switch buyType {
+	case Common.BUY_NONE:
+		if index == MAIN_GAME_01 && rand.IntN(100) < SSWILD_MAIN_GAME_1 {
+			return Utils.RandChoiceByWeight(MGSSMultiList, MGSSMultiWT)
+		} else if index == MAIN_GAME_02 && rand.IntN(100) < SSWILD_MAIN_GAME_2 {
+			return Utils.RandChoiceByWeight(MGSSMultiList, MGSSMultiWT)
+		}
+	case Common.BUY_FREE_SPINS:
+		if rand.IntN(100) < SSWILD_BUY_FREE {
+			return Utils.RandChoiceByWeight(MGSSMultiList, MGBuySSMultiWT)
+		}
+	case Common.BUY_SUPER_FREE_SPINS:
+		if rand.IntN(100) < SSWILD_BUY_SUPER {
+			return Utils.RandChoiceByWeight(MGSSMultiList, MGBuySSMultiWT)
+		}
+	default:
 	}
 
 	return SS
@@ -365,9 +362,8 @@ func (slot *SlotProb) getFreeWildMulti(buyType, index int) Symbol {
 	case Common.BUY_SUPER_FREE_SPINS:
 		if index == FREE_INDEX_2 && rand.IntN(100) < SSWILD_BUY_SUPER_2 {
 			return Utils.RandChoiceByWeight(FGSSMultiList, FGSSMultiWT)
-		} else if index == FREE_INDEX_3 && rand.IntN(100) < SSWILD_BUY_SUPER_3 {
-			return Utils.RandChoiceByWeight(FGSSMultiList, FGSSMultiWT)
 		}
+	default:
 	}
 
 	return SS
@@ -391,11 +387,6 @@ func (slot *SlotProb) getWWSize(level int) int {
 	}
 }
 
-// 计算两点间的曼哈顿距离
-func (slot *SlotProb) manhattanDistance(p1, p2 [2]int) int {
-	return abs(p1[0]-p2[0]) + abs(p1[1]-p2[1])
-}
-
 // 辅助函数：求绝对值
 func abs(x int) int {
 	if x < 0 {
@@ -404,84 +395,172 @@ func abs(x int) int {
 	return x
 }
 
-// 计算金蟾区域到点的最小距离
-func (slot *SlotProb) minDistanceFromFrogToCoin(frogCoordinates []*WildStruct, coin [2]int) (int, [2]int) {
-	pos := [2]int{-1, -1}
-	if len(frogCoordinates) == 0 {
-		return -1, pos
+// 计算金蟾到铜钱的最小距离，同时返回金蟾上与铜钱距离最近的点
+func minDistanceAndPoint(toad []*WildStruct, coin *WildStruct) (int, *WildStruct) {
+	minDist := math.MaxInt32
+	closestPoint := &WildStruct{WildSymbol: 0, WildCoordinate: [2]int{-1, -1}} // 初始化为无效点
+	for _, p := range toad {
+		d := abs(p.WildCoordinate[0]-coin.WildCoordinate[0]) + abs(p.WildCoordinate[1]-coin.WildCoordinate[1])
+		if d < minDist {
+			minDist = d
+			closestPoint = p
+		}
+	}
+	return minDist, closestPoint
+}
+
+// 获取点相对于参考点的方位区域
+// 返回值: 0=右边, 1=左边, 2=上边, 3=下边
+func getDirectionAreaFromPoint(point *WildStruct, refPoint *WildStruct) int {
+	if point.WildCoordinate[0] > refPoint.WildCoordinate[0] {
+		return 0 // 右
+	}
+	if point.WildCoordinate[0] < refPoint.WildCoordinate[0] {
+		return 1 // 左
+	}
+	if point.WildCoordinate[1] < refPoint.WildCoordinate[1] {
+		return 2 // 上
+	}
+	if point.WildCoordinate[1] > refPoint.WildCoordinate[1] {
+		return 3 // 下
 	}
 
-	minDist := slot.manhattanDistance(frogCoordinates[0].WildCoordinate, coin)
-	pos = frogCoordinates[0].WildCoordinate
-	for i := 1; i < len(frogCoordinates); i++ {
-		dist := slot.manhattanDistance(frogCoordinates[i].WildCoordinate, coin)
-		if dist < minDist {
-			minDist = dist
-			pos = frogCoordinates[i].WildCoordinate
+	// 点与参考点重叠
+	return -1
+}
+
+// 计算点在方位区域内的优先级（值越小优先级越高）
+func getPositionPriority(refPoint *WildStruct, point *WildStruct) int {
+	// 计算到参考点的曼哈顿距离
+	distToRef := abs(point.WildCoordinate[0]-refPoint.WildCoordinate[0]) + abs(point.WildCoordinate[1]-refPoint.WildCoordinate[1])
+	return distToRef
+}
+
+// 找到距离金蟾最近的铜钱
+func nextTarget(toad []*WildStruct, coins []*WildStruct) *WildStruct {
+	type candidate struct {
+		point            *WildStruct
+		distance         int         // 铜钱到金蟾的最小距离
+		closestToadPoint *WildStruct // 金蟾上最近的点
+		directionArea    int         // 方位区域: 0=右, 1=左, 2=上, 3=下
+		positionPriority int         // 在方位内的优先级
+	}
+
+	var cands []candidate
+	minDist := math.MaxInt32
+
+	// 1. 找出距离最近的铜钱
+	for _, coin := range coins {
+		d, closestPoint := minDistanceAndPoint(toad, coin)
+		if d < minDist {
+			minDist = d
+			area := getDirectionAreaFromPoint(coin, closestPoint)
+			priority := getPositionPriority(closestPoint, coin)
+			cands = []candidate{{coin, d, closestPoint, area, priority}}
+		} else if d == minDist {
+			area := getDirectionAreaFromPoint(coin, closestPoint)
+			priority := getPositionPriority(closestPoint, coin)
+			cands = append(cands, candidate{coin, d, closestPoint, area, priority})
 		}
 	}
 
-	return minDist, pos
+	// 2. 按方位区域优先级排序: 右(0) > 左(1) > 上(2) > 下(3)
+	// 3. 在同一方位内，按照位置优先级排序
+	// 4. 如果优先级相同，先取X值大的点，再取Y值小的点
+	sort.Slice(cands, func(i, j int) bool {
+		if cands[i].directionArea != cands[j].directionArea {
+			return cands[i].directionArea < cands[j].directionArea
+		}
+		if cands[i].positionPriority != cands[j].positionPriority {
+			return cands[i].positionPriority < cands[j].positionPriority
+		}
+		if cands[i].point.WildCoordinate[0] != cands[j].point.WildCoordinate[0] {
+			return cands[i].point.WildCoordinate[0] > cands[j].point.WildCoordinate[0]
+		}
+		return cands[i].point.WildCoordinate[1] < cands[j].point.WildCoordinate[1]
+	})
+
+	return cands[0].point
 }
 
-// 寻找金蟾应移动到的目标位置
-func (slot *SlotProb) findTargetCoin(frogCoordinates []*WildStruct, coins []*WildStruct) ([]*WildStruct, []*WildStruct) {
-	// 边界检查：如果没有铜钱，返回nil
-	if len(coins) <= 0 || len(frogCoordinates) <= 0 {
-		return nil, nil
+// 获取金蟾的尺寸和左上角坐标
+func getToadSizeAndTopLeft(toad []*WildStruct) (int, *WildStruct) {
+	if len(toad) == 0 {
+		return 0, &WildStruct{WildSymbol: 0, WildCoordinate: [2]int{0, 0}}
 	}
 
-	wwPoss := make([]*WildStruct, len(coins))
-	dists := make([]int, len(coins))
-	origin := [2]int{0, 0}
+	// 找出最小的x和y坐标作为左上角
+	minX, minY := toad[0].WildCoordinate[0], toad[0].WildCoordinate[1]
+	maxX, maxY := toad[0].WildCoordinate[0], toad[0].WildCoordinate[1]
 
-	// 计算每个铜钱到金蟾区域的最小距离和对应金蟾坐标
-	for i, coin := range coins {
-		dist, wwPos := slot.minDistanceFromFrogToCoin(frogCoordinates, coin.WildCoordinate)
-		dists[i] = dist
-		wwPoss[i] = &WildStruct{WildCoordinate: wwPos}
+	for _, p := range toad {
+		if p.WildCoordinate[0] < minX {
+			minX = p.WildCoordinate[0]
+		}
+		if p.WildCoordinate[1] < minY {
+			minY = p.WildCoordinate[1]
+		}
+		if p.WildCoordinate[0] > maxX {
+			maxX = p.WildCoordinate[0]
+		}
+		if p.WildCoordinate[1] > maxY {
+			maxY = p.WildCoordinate[1]
+		}
 	}
 
-	// 计算移动顺序
-	for i := range coins {
-		// 找到最小距离的铜钱
-		minIndex := i
-		for j := i + 1; j < len(coins); j++ {
-			if dists[j] < dists[minIndex] {
-				minIndex = j
-			} else if dists[j] == dists[minIndex] {
-				// 如果距离相同，选择距离(0,0)最远的点
-				distToOriginCurrent := slot.manhattanDistance(coins[j].WildCoordinate, origin)
-				distToOriginSelected := slot.manhattanDistance(coins[minIndex].WildCoordinate, origin)
+	// 计算尺寸
+	size := maxX - minX + 1
+	// 确保是正方形
+	if maxY-minY+1 > size {
+		size = maxY - minY + 1
+	}
 
-				if distToOriginCurrent > distToOriginSelected {
-					minIndex = j
-				} else if distToOriginCurrent == distToOriginSelected {
-					// 如果距离(0,0)也相同，选择x值最小的
-					if coins[j].WildCoordinate[1] < coins[minIndex].WildCoordinate[1] {
-						minIndex = j
-					}
-				}
+	return size, &WildStruct{WildSymbol: 0, WildCoordinate: [2]int{minX, minY}}
+}
+
+// 移动金蟾到目标铜钱位置
+func moveTo(toad []*WildStruct, target *WildStruct) []*WildStruct {
+	size, topLeft := getToadSizeAndTopLeft(toad)
+	minDist := math.MaxInt32
+	var newTopLeft WildStruct
+
+	for i := 0; i < size; i++ {
+		for j := 0; j < size; j++ {
+			tlx, tly := target.WildCoordinate[0]-i, target.WildCoordinate[1]-j
+			if tlx < 0 || tly < 0 || tlx+size > 6 || tly+size > 6 {
+				continue
+			}
+			d := abs(topLeft.WildCoordinate[0]-tlx) + abs(topLeft.WildCoordinate[1]-tly)
+			if d < minDist {
+				minDist = d
+				newTopLeft = WildStruct{WildSymbol: 0, WildCoordinate: [2]int{tlx, tly}}
 			}
 		}
+	}
 
-		// 交换位置
-		if minIndex != i {
-			dists[i], dists[minIndex] = dists[minIndex], dists[i]
-			coins[i], coins[minIndex] = coins[minIndex], coins[i]
-			wwPoss[i], wwPoss[minIndex] = wwPoss[minIndex], wwPoss[i]
+	// 计算金蟾需要移动的距离
+	dx := newTopLeft.WildCoordinate[0] - topLeft.WildCoordinate[0]
+	dy := newTopLeft.WildCoordinate[1] - topLeft.WildCoordinate[1]
+
+	// 更新金蟾所有点的位置
+	newToad := make([]*WildStruct, len(toad))
+	for i, p := range toad {
+		newToad[i] = &WildStruct{
+			WildSymbol:     p.WildSymbol,
+			WildCoordinate: [2]int{p.WildCoordinate[0] + dx, p.WildCoordinate[1] + dy},
 		}
 	}
-
-	return coins, wwPoss
+	return newToad
 }
 
-// 计算移动向量
-func (slot *SlotProb) calculateMoveVector(pos1, pos2 [2]int) [2]int {
-	return [2]int{
-		pos1[0] - pos2[0],
-		pos1[1] - pos2[1],
+// 是否有铜钱被金蟾覆盖
+func isCovered(toad []*WildStruct, coin *WildStruct) bool {
+	for _, p := range toad {
+		if p.WildCoordinate[0] == coin.WildCoordinate[0] && p.WildCoordinate[1] == coin.WildCoordinate[1] {
+			return true
+		}
 	}
+	return false
 }
 
 // 金蟾变大算法
@@ -636,8 +715,8 @@ func (slot *SlotProb) WWLevelUp(result *SlotResult) {
 	   ．Lv5 -> Lv6：累積 3 銅錢，+1 Free Spins，三足金蟾變成 6*6 大小
 	*/
 
-	// 如果没有铜钱，则不处理
-	if len(result.SSWild) <= 0 || result == nil {
+	// 如果没有铜钱或结果为空，则不处理
+	if len(result.SSWild) <= 0 || result == nil || len(result.WWWild) <= 0 {
 		return
 	}
 
@@ -662,31 +741,32 @@ func (slot *SlotProb) WWLevelUp(result *SlotResult) {
 
 	// 记录当前金蟾等级
 	oldLevel := result.WWLevel
-	targetCoin, wwPos := slot.findTargetCoin(result.WWWild, result.SSWild)
 
-	// 处理每个铜钱，首先全部吃掉
-	moveVector := make([][2]int, len(targetCoin))
-	for i := 0; i < len(targetCoin) && i < len(wwPos); i++ {
-		moveVector[i] = slot.calculateMoveVector(targetCoin[i].WildCoordinate, wwPos[i].WildCoordinate)
-	}
-	for i := 0; i < len(targetCoin) && i < len(wwPos); i++ {
-		// 更新金蟾位置
+	// 逐个吃掉所有铜钱
+	for len(result.SSWild) > 0 {
+		// 从剩余铜钱中找出离金蟾最近的一个
+		nextCoin := nextTarget(result.WWWild, result.SSWild)
+
+		// 清除旧的金蟾位置
 		for _, v := range result.WWWild {
 			tumbleSymbol[v.WildCoordinate[0]][v.WildCoordinate[1]] = NN
 		}
-		for _, v := range result.WWWild {
-			v.WildCoordinate[0] += moveVector[i][0]
-			v.WildCoordinate[1] += moveVector[i][1]
-			tumbleSymbol[v.WildCoordinate[0]][v.WildCoordinate[1]] = WW
-		}
-		// 更新向量
-		for j := i + 1; j < len(moveVector); j++ {
-			moveVector[j][0] -= moveVector[i][0]
-			moveVector[j][1] -= moveVector[i][1]
+
+		// 移动金蟾到目标铜钱位置
+		toadWilds := moveTo(result.WWWild, nextCoin)
+
+		// 更新金蟾位置
+		result.WWWild = result.WWWild[:0]
+		for _, wild := range toadWilds {
+			result.WWWild = append(result.WWWild, &WildStruct{
+				WildSymbol:     wild.WildSymbol,
+				WildCoordinate: wild.WildCoordinate,
+			})
+			tumbleSymbol[wild.WildCoordinate[0]][wild.WildCoordinate[1]] = WW
 		}
 
 		// 处理当前目标铜钱，增加计数
-		switch targetCoin[i].WildSymbol {
+		switch nextCoin.WildSymbol {
 		case SS:
 			result.SSCount += 1
 		case SS2:
@@ -700,6 +780,15 @@ func (slot *SlotProb) WWLevelUp(result *SlotResult) {
 			result.WWMultiplier += 5
 		}
 
+		// 从铜钱列表中移除已吃掉的铜钱
+		for i := 0; i < len(result.SSWild); i++ {
+			if result.SSWild[i].WildCoordinate[0] == nextCoin.WildCoordinate[0] &&
+				result.SSWild[i].WildCoordinate[1] == nextCoin.WildCoordinate[1] {
+				result.SSWild = append(result.SSWild[:i], result.SSWild[i+1:]...)
+				break
+			}
+		}
+
 		// 添加表演效果
 		tmpSpinResult := &SpinResult{
 			TumbleSymbol:    make(GameSymbol, len(tumbleSymbol)),
@@ -711,6 +800,8 @@ func (slot *SlotProb) WWLevelUp(result *SlotResult) {
 		}
 		result.FGSpinList = append(result.FGSpinList, tmpSpinResult)
 	}
+
+	// 清空铜钱列表，因为所有铜钱都被吃掉了
 	result.SSWild = result.SSWild[:0]
 
 	// 吃完所有铜钱后，检查是否需要升级
@@ -728,7 +819,7 @@ func (slot *SlotProb) WWLevelUp(result *SlotResult) {
 		result.WWLevel = 1
 	}
 
-	// 如果金蟾升级了，使用新的变大算法更新其大小和坐标
+	// 如果金蟾升级了，使用变大算法更新其大小和坐标
 	if result.WWLevel > oldLevel && len(result.WWWild) > 0 {
 		// 使用变大算法计算新的基准位置
 		result.WWWild = slot.expandFrog(result.WWWild, result.WWLevel)
@@ -790,18 +881,10 @@ func (slot *SlotProb) RandMGSymbol(rtp int, buyType int, lineBet int, tumbleResu
 		fmt.Printf("[ERROR] RandMGSymbol: RTP = %d, BuyType = %d, MGReelGroupRoulette spin failed.\n", rtp, buyType)
 		return -1, Common.ERROR_CODE_ROULETTE_SPIN_FAILED, nil, nil
 	}
-	// if groupIdx != MAIN_GAME_SUPER {
-	// 	fmt.Printf("[WARNING] RandMGSymbol groupIdx %d\n", groupIdx)
-	// }
 	reelGroup := MGReelGroup[rtp][groupIdx]
 
 	tmpWWWild := make([]*WildStruct, 0)
 	tmpSSWild := make([]*WildStruct, 0)
-	replaceSymbol := NN
-	if groupIdx == MAIN_GAME_MYSTERY {
-		// 把保底轴中的NN按概率统一替换
-		replaceSymbol = Utils.RandChoiceByWeight(MysteryList, MysteryWT)
-	}
 
 	// 產出盤面
 	tumbleResult.TumbleSymbol = make(GameSymbol, SLOT_COL)
@@ -819,16 +902,12 @@ func (slot *SlotProb) RandMGSymbol(rtp int, buyType int, lineBet int, tumbleResu
 			} else {
 				columnSymbol[row] = reel[idx-reelLength]
 			}
-			// 如果是替换符号，则替换
-			if groupIdx == MAIN_GAME_MYSTERY && replaceSymbol != NN && columnSymbol[row] == NN {
-				columnSymbol[row] = replaceSymbol
-			}
 		}
 		tumbleResult.TumbleSymbol[col] = columnSymbol
 		tumbleResult.ReelIndex[col] = dice
 	}
 
-	if groupIdx == MAIN_GAME_FREE {
+	if buyType == Common.BUY_FREE_SPINS {
 		// 随机打乱列2-6的顺序
 		rand.Shuffle(SLOT_COL-1, func(i, j int) {
 			col1 := i + 1
@@ -850,7 +929,7 @@ func (slot *SlotProb) RandMGSymbol(rtp int, buyType int, lineBet int, tumbleResu
 
 	// 处理铜钱倍数
 	if len(tmpSSWild) > 0 {
-		if groupIdx == MAIN_GAME_SUPER {
+		if buyType == Common.BUY_SUPER_FREE_SPINS {
 			// Buy Super 的时候，从铜钱wild里面随机选一个变成倍数
 			randIndex := rand.IntN(len(tmpSSWild))
 			tmpSSWild[randIndex].WildSymbol = Utils.RandChoiceByWeight(MGSSMultiList, MGSSMultiWT)
@@ -858,13 +937,13 @@ func (slot *SlotProb) RandMGSymbol(rtp int, buyType int, lineBet int, tumbleResu
 
 			for i := range tmpSSWild {
 				if i != randIndex {
-					tmpSSWild[i].WildSymbol = slot.getMainWildMulti(groupIdx)
+					tmpSSWild[i].WildSymbol = slot.getMainWildMulti(buyType, groupIdx)
 					tumbleResult.TumbleSymbol[tmpSSWild[i].WildCoordinate[0]][tmpSSWild[i].WildCoordinate[1]] = tmpSSWild[i].WildSymbol
 				}
 			}
 		} else {
 			for _, ssWild := range tmpSSWild {
-				ssWild.WildSymbol = slot.getMainWildMulti(groupIdx)
+				ssWild.WildSymbol = slot.getMainWildMulti(buyType, groupIdx)
 				tumbleResult.TumbleSymbol[ssWild.WildCoordinate[0]][ssWild.WildCoordinate[1]] = ssWild.WildSymbol
 			}
 		}
@@ -875,7 +954,10 @@ func (slot *SlotProb) RandMGSymbol(rtp int, buyType int, lineBet int, tumbleResu
 
 // RandFGSymbol  亂數產生免費遊戲獎圖盤面
 func (slot *SlotProb) RandFGSymbol(rtp int, buyType int, lineBet int, spinResult *SpinResult, result *SlotResult, debugCmd *DebugCmd) (int, int) {
-	groupIdx := FREE_GAME_01
+	groupIdx := Utils.RandChoiceByWeight(FGGroupIndexList, FGLevelGroupIndexWT[result.BuyType][result.FGIndex][result.WWLevel])
+	if result.SpecialSpin {
+		groupIdx = FREE_GAME_04
+	}
 	// 處理測試指令
 	var debugReelIndex []int
 	if debugCmd != nil {
@@ -889,77 +971,29 @@ func (slot *SlotProb) RandFGSymbol(rtp int, buyType int, lineBet int, spinResult
 	}
 
 	replaceSymbol := NN
-	switch result.BuyType {
-	case Common.BUY_FREE_SPINS:
-		groupIdx = BUY_FREE_GAME_01
-		switch result.FGIndex {
-		case FREE_INDEX_1:
-			if result.WWLevel > 3 {
-				groupIdx = BUY_FREE_GAME_03
-			} else if result.WWLevel > 1 {
-				groupIdx = BUY_FREE_GAME_02
-			}
-		case FREE_INDEX_2:
-			if result.WWLevel > 4 {
-				groupIdx = BUY_FREE_GAME_03
-			} else if result.WWLevel > 2 {
-				groupIdx = BUY_FREE_GAME_02
-			}
-		case FREE_INDEX_3:
-			if result.WWLevel > 3 {
-				groupIdx = BUY_FREE_GAME_03
-			}
-		default:
-		}
-	case Common.BUY_SUPER_FREE_SPINS:
-		groupIdx = BUY_FREE_GAME_01
-		switch result.FGIndex {
-		case FREE_INDEX_1:
-			groupIdx = BUY_FREE_GAME_02
-			if result.WWLevel > 2 {
-				groupIdx = BUY_FREE_GAME_03
-			}
-		case FREE_INDEX_2:
-			groupIdx = BUY_FREE_GAME_02
-			if result.WWLevel > 3 {
-				groupIdx = BUY_FREE_GAME_03
-			}
-		case FREE_INDEX_3:
-			if result.WWLevel > 3 {
-				groupIdx = BUY_FREE_GAME_03
-			}
-		default:
-		}
-	default:
-		// 根据金蟾大小，选取卷轴
-		if result.WWLevel > 4 {
-			groupIdx = FREE_GAME_02
-		}
-		// free累计win ≤10 X total bet，时使用Mystery Reel
-		if result.FreeWin <= uint64(10*lineBet*PAYLINE_TOTAL) {
-			if (result.FGIndex == FREE_INDEX_1 && rand.IntN(100) < FREE_MYSTERY_1) ||
-				(result.FGIndex == FREE_INDEX_2 && rand.IntN(100) < FREE_MYSTERY_2) ||
-				(result.FGIndex == FREE_INDEX_3 && rand.IntN(100) < FREE_MYSTERY_3) {
-				groupIdx = MAIN_GAME_MYSTERY
-				// 把保底轴中的NN按概率统一替换
-				replaceSymbol = Utils.RandChoiceByWeight(MysteryList, MysteryWT)
-			}
-		}
-	}
-
 	reelGroup := FGReelGroup[rtp][groupIdx]
+
+	if groupIdx == FREE_GAME_04 {
+		// 全盘替代
+		replaceSymbol = Utils.RandChoiceByWeight(MysteryList, MysteryGloballWT)
+	}
 
 	// 產出盤面
 	spinResult.TumbleSymbol = make(GameSymbol, SLOT_COL)
 	spinResult.ReelIndex = make([]int, SLOT_COL)
 	for col := range SLOT_COL {
 		// 產出獎圖
-		reel := reelGroup[col] // 轉輪帶
+		reel := reelGroup[col]
 		reelLength := len(reel)
 		dice := rand.IntN(reelLength)
 		// 處理測試指令中的停輪位置，並檢查是否合法
 		if debugReelIndex != nil && 0 <= debugReelIndex[col] && debugReelIndex[col] < reelLength {
 			dice = debugReelIndex[col]
+		}
+
+		if groupIdx == FREE_GAME_01 || groupIdx == FREE_GAME_02 {
+			// 按列替代
+			replaceSymbol = Utils.RandChoiceByWeight(MysteryList, MysteryColWT)
 		}
 		columnSymbol := make(ReelSymbol, SLOT_ROW)
 		for row := range SLOT_ROW {
@@ -970,7 +1004,7 @@ func (slot *SlotProb) RandFGSymbol(rtp int, buyType int, lineBet int, spinResult
 				columnSymbol[row] = reel[idx-reelLength]
 			}
 			// 如果是替换符号，则替换
-			if groupIdx == MAIN_GAME_MYSTERY && replaceSymbol != NN && columnSymbol[row] == NN {
+			if replaceSymbol != NN && columnSymbol[row] == NN {
 				columnSymbol[row] = replaceSymbol
 			}
 		}

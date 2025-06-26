@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 type args struct {
@@ -51,14 +52,14 @@ func TestRunMainGame(t *testing.T) {
 	// }
 
 	tests := []argCmd{}
-	for range 1000 {
+	for range 10000 {
 		tests = append(tests, argCmd{
 			"進行遊戲: 購買免費",
 			&SlotProb{},
 			args{
 				rtp:     0,
 				lineBet: 1,
-				result:  &SlotResult{BuyType: Common.BUY_FREE_SPINS},
+				result:  &SlotResult{BuyType: Common.BUY_NONE},
 				symbol: GameSymbol{
 					{2, 4, 6, 3, 4, 2},
 					{3, 5, 2, 4, 7, 6},
@@ -272,47 +273,6 @@ func TestReel(t *testing.T) {
 	}
 }
 
-func TestFindTargetCoin(t *testing.T) {
-	slot := &SlotProb{}
-	result := &SlotResult{
-		WWWild: []*WildStruct{
-			{WildSymbol: WW, WildCoordinate: [2]int{3, 1}},
-		},
-		SSWild: []*WildStruct{
-			{WildSymbol: SS, WildCoordinate: [2]int{0, 3}},
-			{WildSymbol: SS, WildCoordinate: [2]int{1, 4}},
-			{WildSymbol: SS, WildCoordinate: [2]int{2, 5}},
-			{WildSymbol: SS, WildCoordinate: [2]int{3, 4}},
-		},
-	}
-	targetCoin, wwPos := slot.findTargetCoin(result.WWWild, result.SSWild)
-	for i := 0; i < len(targetCoin) && i < len(wwPos); i++ {
-		fmt.Printf("SSWild: %v, WWWild: %v\n", targetCoin[i].WildCoordinate, wwPos[i].WildCoordinate)
-	}
-	//移动向量
-	moveVector := make([][2]int, len(targetCoin))
-	for i := 0; i < len(targetCoin) && i < len(wwPos); i++ {
-		moveVector[i] = [2]int{targetCoin[i].WildCoordinate[0] - wwPos[i].WildCoordinate[0],
-			targetCoin[i].WildCoordinate[1] - wwPos[i].WildCoordinate[1]}
-		fmt.Printf("Move Vector: %v\n", moveVector[i])
-	}
-	// 更新金蟾
-	for i := 0; i < len(targetCoin) && i < len(wwPos); i++ {
-		for _, v := range result.WWWild {
-			v.WildCoordinate[0] += moveVector[i][0]
-			v.WildCoordinate[1] += moveVector[i][1]
-			fmt.Printf("%v, ", v.WildCoordinate)
-		}
-		// 更新向量
-		for j := i + 1; j < len(moveVector); j++ {
-			moveVector[j][0] -= moveVector[i][0]
-			moveVector[j][1] -= moveVector[i][1]
-			fmt.Printf("Updated Move Vector[%d]: %v\n", j, moveVector[j])
-		}
-		fmt.Println()
-	}
-}
-
 func TestExpandFrog(t *testing.T) {
 	slot := &SlotProb{}
 	result := &SlotResult{
@@ -451,4 +411,384 @@ func (slot *SlotProb) TestCalculateWin(gameSymbol GameSymbol, lineBet int) {
 	fmt.Printf("LineSymbol: %v\n", spinResult.LineSymbol)
 	fmt.Printf("LineCount: %v\n", spinResult.LineCount)
 	fmt.Printf("LineWin: %v\n", spinResult.LineWin)
+}
+
+func printGrid(toad *[]*WildStruct, coins *[]*WildStruct, step int, caseNum int) {
+	grid := [6][6]rune{}
+	for i := range grid {
+		for j := range grid[i] {
+			grid[i][j] = '.'
+		}
+	}
+	for _, c := range *coins {
+		grid[c.WildCoordinate[1]][c.WildCoordinate[0]] = 'S'
+	}
+	for _, p := range *toad {
+		grid[p.WildCoordinate[1]][p.WildCoordinate[0]] = 'W'
+	}
+	fmt.Printf("\033[2J\033[H")
+	fmt.Printf("测试用例 %d, 步骤 %d:\n", caseNum, step)
+	for i := 0; i < 6; i++ {
+		for j := 0; j < 6; j++ {
+			fmt.Printf("%c ", grid[i][j])
+		}
+		fmt.Println()
+	}
+	time.Sleep(2000 * time.Millisecond)
+}
+
+// 运行单个测试用例的模拟
+func runSimulation(toad []*WildStruct, coins []*WildStruct, caseNum int) []*WildStruct {
+	step := 0
+	printGrid(&toad, &coins, step, caseNum)
+	sortCoins := []*WildStruct{}
+
+	for len(coins) > 0 {
+		step++
+		target := nextTarget(toad, coins)
+		_, topLeft := getToadSizeAndTopLeft(toad)
+		fmt.Printf("\n金蟾当前位置: %+v，移动目标铜钱: %+v\n", topLeft, target)
+		toad = moveTo(toad, target)
+
+		newCoins := []*WildStruct{}
+		sortCoins = append(sortCoins, target)
+		for _, c := range coins {
+			if !isCovered(toad, c) {
+				newCoins = append(newCoins, c)
+			} else {
+				if c.WildCoordinate[0] == target.WildCoordinate[0] && c.WildCoordinate[1] == target.WildCoordinate[1] {
+					continue
+				}
+				fmt.Printf("吃掉铜钱: %+v\n", c)
+				sortCoins = append(sortCoins, c)
+			}
+		}
+		coins = newCoins
+		printGrid(&toad, &coins, step, caseNum)
+	}
+
+	return sortCoins
+}
+
+func TestToadMove(t *testing.T) {
+	// 定义多组测试用例
+	testCases := []struct {
+		toad  []*WildStruct
+		coins []*WildStruct
+	}{
+		{
+			toad: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 1}},
+			},
+			coins: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{5, 0}},
+			},
+		},
+		{
+			toad: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 3}},
+			},
+			coins: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 5}},
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 5}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{5, 0}},
+			},
+		},
+		{
+			toad: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 4}},
+			},
+			coins: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{5, 2}},
+			},
+		},
+		{
+			toad: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 2}},
+			},
+			coins: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 5}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 5}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 5}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{5, 0}},
+			},
+		},
+		{
+			toad: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 4}},
+			},
+			coins: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 5}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 5}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 5}},
+				{WildSymbol: 0, WildCoordinate: [2]int{5, 1}},
+			},
+		},
+		{
+			toad: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 3}},
+			},
+			coins: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 3}},
+			},
+		},
+		{
+			toad: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 4}},
+			},
+			coins: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{5, 3}},
+			},
+		},
+		{
+			toad: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 3}},
+			},
+			coins: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{5, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 5}},
+			},
+		},
+		{
+			toad: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 4}},
+			},
+			coins: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 5}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 5}},
+				{WildSymbol: 0, WildCoordinate: [2]int{5, 0}},
+			},
+		},
+		{
+			toad: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 4}},
+			},
+			coins: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 5}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 5}},
+				{WildSymbol: 0, WildCoordinate: [2]int{5, 2}},
+			},
+		},
+		{
+			toad: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 4}},
+			},
+			coins: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 5}},
+				{WildSymbol: 0, WildCoordinate: [2]int{5, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{5, 5}},
+			},
+		},
+		{
+			toad: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{1, 5}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{2, 5}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{3, 5}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{4, 5}},
+				{WildSymbol: 0, WildCoordinate: [2]int{5, 1}},
+				{WildSymbol: 0, WildCoordinate: [2]int{5, 2}},
+				{WildSymbol: 0, WildCoordinate: [2]int{5, 3}},
+				{WildSymbol: 0, WildCoordinate: [2]int{5, 4}},
+				{WildSymbol: 0, WildCoordinate: [2]int{5, 5}},
+			},
+			coins: []*WildStruct{
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 0}},
+				{WildSymbol: 0, WildCoordinate: [2]int{0, 5}},
+				{WildSymbol: 0, WildCoordinate: [2]int{5, 0}},
+			},
+		},
+	}
+
+	// 存储每个测试用例的结果
+	results := make([][]*WildStruct, len(testCases))
+
+	// 运行所有测试用例
+	for i, tc := range testCases {
+		fmt.Printf("\n开始运行测试用例 %d\n", i+1)
+		// 创建副本以防修改原始数据
+		toad := make([]*WildStruct, len(tc.toad))
+		copy(toad, tc.toad)
+		coins := make([]*WildStruct, len(tc.coins))
+		copy(coins, tc.coins)
+
+		results[i] = runSimulation(toad, coins, i+1)
+	}
+
+	// 打印所有测试用例的结果摘要
+	fmt.Println("\n\n=======================================")
+	fmt.Println("所有测试用例运行完毕，结果摘要如下：")
+	fmt.Println("=======================================")
+
+	for i, result := range results {
+		fmt.Printf("\n测试用例 %d 铜钱吃掉顺序：\n", i+1)
+		for j, coin := range result {
+			fmt.Printf("  %d. 位置(%d, %d)\n", j+1, coin.WildCoordinate[0], coin.WildCoordinate[1])
+		}
+	}
 }

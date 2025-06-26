@@ -34,13 +34,15 @@ type RTPVerifier struct {
 	FGCount          [FREE_GAME_02 + 1]int // 進入免費遊戲次數
 	FGTotalSpinCount int                   // 免費遊戲總場次
 
-	MGTotalTJHZCount int // 主遊戲天隆横财總和
-	FGTotalTJHZCount int // 免費遊戲天隆横财總和
+	MGTotalFeatureWin   float64 // 主遊戲天隆横财總和
+	MGTotalFeatureCount int     // 主遊戲天隆横财總和
+	FGTotalFeatureWin   float64 // 免費遊戲天隆横财總和
+	FGTotalFeatureCount int     // 免費遊戲天隆横财總和
 
 	FGWWLevel      [7]int // 免費遊戲金蟾等級
 	FGWWMultiplier []int  // 免費遊戲金蟾乘倍
 
-	FGIndexCount [FREE_INDEX_3 + 1]int // 免費遊戲索引次數 (依 FreeGameType 統計)
+	FGIndexCount [FREE_INDEX_2 + 1]int // 免費遊戲索引次數 (依 FreeGameType 統計)
 
 	FGH5Win      [FREE_GAME_02 + 1][MAX_STAGE + 1]float64                             // 免費遊戲 H5 獎圖贏分 (依 FreeGameType、Stage 分別統計)
 	FGWildCount  [FREE_GAME_02 + 1][MAX_WIN_SCATTER_COUNT + 1][MAX_WILD_COUNT + 1]int // 免費遊戲 CumWildCount 統計 (依 FreeGameType、ScatterCount 分別統計)
@@ -63,7 +65,10 @@ func (rv *RTPVerifier) Clear() {
 	rv.MGHitCount = 0
 	rv.FGHitCount = 0
 	rv.FGTotalSpinCount = 0
-	rv.MGTotalTJHZCount = 0
+	rv.MGTotalFeatureWin = 0
+	rv.MGTotalFeatureCount = 0
+	rv.FGTotalFeatureWin = 0
+	rv.FGTotalFeatureCount = 0
 }
 
 // RunAll 驗證所有 RTP
@@ -84,7 +89,7 @@ func (rv *RTPVerifier) Run(rtp int, buyType int) {
 	rv.Clear()
 
 	// 确定并发数量，根据CPU核心数量或设定合理的值
-	numWorkers := 8
+	numWorkers := 10
 	if numWorkers > rv.TotalCount {
 		numWorkers = rv.TotalCount
 	}
@@ -159,12 +164,9 @@ func (rv *RTPVerifier) ProcessResult(gameMode int, result *SlotResult) {
 			}
 		}
 	}
-	var respinCount = len(result.MGTumbleList[0].TumbleSymbol)
-	rv.MGTotalTJHZCount += respinCount
-	if respinCount > MAX_RESPIN_COUNT {
-		respinCount = MAX_RESPIN_COUNT
-	}
-	rv.MGRespinWin[respinCount] += float64(result.MainWin)
+
+	rv.MGTotalFeatureWin += float64(result.MGFeatureWin)
+	rv.MGTotalFeatureCount += result.MGFeatureCount
 
 	// 免費遊戲
 	if gameMode&Common.GAME_MODE_FREE == Common.GAME_MODE_FREE {
@@ -193,6 +195,7 @@ func (rv *RTPVerifier) ProcessResult(gameMode int, result *SlotResult) {
 		}
 		rv.FGWWLevel[result.WWLevel]++
 		rv.FGWWMultiplier = append(rv.FGWWMultiplier, result.WWMultiplier)
+		rv.FGTotalFeatureCount += result.FGFeatureCount
 		// var lastSymbol = result.MGTumbleList[respinCount].TumbleSymbol
 		// var scatterCount = rv.slot.GetSymbolCount(lastSymbol, SS)
 		// var cumWildCount = result.FGCumWildCount
@@ -210,14 +213,18 @@ func (rv *RTPVerifier) Dump(detail bool) {
 
 	var totalWin = rv.TotalMainWin + rv.TotalFreeWin
 	var FGTotalCount = Utils.Sum(rv.FGCount[:])
-	fmt.Printf("TotalBet: %.1f, TotalWin: %.1f, Total RTP: %s\n", rv.TotalBet, totalWin, Utils.GetPercentage(totalWin, rv.TotalBet))
-	fmt.Printf("  %16s %16s  %10s  %10s  %10s  %10s  %10s\n", "Win", "RTP %", "Hit %", "Trigger %", "MaxOdds", "Avg.Round", "Avg.Respin")
+	fmt.Printf("TotalBet: %12.1f, TotalWin: %12.1f, Total RTP: %s\n", rv.TotalBet, totalWin, Utils.GetPercentage(totalWin, rv.TotalBet))
+	fmt.Printf("  %-8s  %16s  %10s  %10s  %10s  %10s  %10s  %10s\n", "", "Win", "RTP %", "Hit %", "Trigger %", "MaxOdds", "Avg.Round", "Avg.Respin")
 	fmt.Println("--------------------------------------------------------------------------------")
-	fmt.Printf("Main: %.1f %12s  %10s", rv.TotalMainWin, Utils.GetPercentage(rv.TotalMainWin, rv.TotalBet), Utils.GetPercentage(float64(rv.MGHitCount), float64(rv.TotalCount)))
-	fmt.Printf("  %10s  %10.2f  %10s  %10.2f\n", "", float64(rv.MaxMainWin)/float64(rv.LineBet*PAYLINE_TOTAL), "", float64(rv.MGTotalTJHZCount)/float64(rv.MGHitCount))
-	fmt.Printf("Free: %.1f %12s  %10s", rv.TotalFreeWin, Utils.GetPercentage(rv.TotalFreeWin, rv.TotalBet), Utils.GetPercentage(float64(rv.FGHitCount), float64(rv.FGTotalSpinCount)))
+	fmt.Printf("  %-8s  %16.1f  %10s  %10s", "Main:", rv.TotalMainWin, Utils.GetPercentage(rv.TotalMainWin, rv.TotalBet), Utils.GetPercentage(float64(rv.MGHitCount), float64(rv.TotalCount)))
+	fmt.Printf("  %10s  %10.2f  %10s  %10.2f\n", "", float64(rv.MaxMainWin)/float64(rv.LineBet*PAYLINE_TOTAL), "", float64(rv.MGTotalFeatureCount)/float64(rv.MGHitCount))
+	// fmt.Printf("  %-8s  %16.1f  %10s  %10s\n", "Feature:", rv.MGTotalFeatureWin, Utils.GetPercentage(rv.MGTotalFeatureWin, rv.TotalBet), Utils.GetPercentage(float64(rv.MGTotalFeatureCount), float64(rv.TotalCount)))
+	// fmt.Printf("  %10s  %10.2f  %10s  %10.2f\n", "", "", "")
+	fmt.Printf("  %-8s  %16.1f  %10s  %10s", "Free:", rv.TotalFreeWin, Utils.GetPercentage(rv.TotalFreeWin, rv.TotalBet), Utils.GetPercentage(float64(rv.FGHitCount), float64(rv.FGTotalSpinCount)))
 	fmt.Printf("  %10s  %10.2f  %10.2f  %10s\n", Utils.GetPercentage(float64(FGTotalCount), float64(rv.TotalCount)), float64(rv.MaxFreeWin)/float64(rv.LineBet*PAYLINE_TOTAL), float64(rv.FGTotalSpinCount)/float64(FGTotalCount), "")
-	fmt.Printf("--------------------------------  %12s  --------------------------------\n", "FGIndex Count")
+	// fmt.Printf("  %-8s  %16.1f  %10s  %10s\n", "Feature:", float64(0), "", Utils.GetPercentage(float64(rv.FGTotalFeatureCount), float64(rv.FGTotalSpinCount)))
+	// fmt.Printf("  %10s  %10.2f  %10.2f  %10s\n", Utils.GetPercentage(float64(FGTotalCount), float64(rv.TotalCount)), float64(rv.MaxFreeWin)/float64(rv.LineBet*PAYLINE_TOTAL), float64(rv.FGTotalSpinCount)/float64(FGTotalCount), "")
+	fmt.Printf("------------------------  %20s  ------------------------\n", "FGIndex Count")
 	sumFGIndex := Utils.Sum(rv.FGIndexCount[:])
 	for j := range len(rv.FGIndexCount) {
 		fmt.Printf("%d:%10s    ", j+1, Utils.GetPercentage(float64(rv.FGIndexCount[j]), float64(sumFGIndex)))
@@ -234,24 +241,24 @@ func (rv *RTPVerifier) Dump(detail bool) {
 		fmt.Printf("%d:%10s    ", j, Utils.GetPercentage(float64(rv.FGWWLevel[j]), float64(sumWWLevel)))
 	}
 	fmt.Println()
-	fmt.Printf("=================================  %10s  =================================\n", "Main  Game")
-	fmt.Printf("  %22s  %16s  %16s  %16s  %16s\n", "x2", "x3", "x4", "x5", "x6")
-	for symbol := WW; symbol <= SS; symbol++ {
-		fmt.Printf("  %3s)", symbol)
-		for count := 2; count <= SLOT_COL; count++ {
-			fmt.Printf("  %16s", Utils.GetPercentage(rv.MGSymbolWin[symbol][count], rv.TotalBet))
-		}
-		fmt.Println("")
-	}
-	fmt.Printf("=================================  %10s  =================================\n", "Free  Game")
-	fmt.Printf("  %22s  %16s  %16s  %16s  %16s\n", "x2", "x3", "x4", "x5", "x6")
-	for symbol := WW; symbol <= SS; symbol++ {
-		fmt.Printf("  %3s)", symbol)
-		for count := 2; count <= SLOT_COL; count++ {
-			fmt.Printf("  %16s", Utils.GetPercentage(rv.FGSymbolWin[symbol][count], rv.TotalBet))
-		}
-		fmt.Println("")
-	}
+	// fmt.Printf("=================================  %10s  =================================\n", "Main  Game")
+	// fmt.Printf("  %22s  %16s  %16s  %16s  %16s\n", "x2", "x3", "x4", "x5", "x6")
+	// for symbol := WW; symbol <= SS; symbol++ {
+	// 	fmt.Printf("  %3s)", symbol)
+	// 	for count := 2; count <= SLOT_COL; count++ {
+	// 		fmt.Printf("  %16s", Utils.GetPercentage(rv.MGSymbolWin[symbol][count], rv.TotalBet))
+	// 	}
+	// 	fmt.Println("")
+	// }
+	// fmt.Printf("=================================  %10s  =================================\n", "Free  Game")
+	// fmt.Printf("  %22s  %16s  %16s  %16s  %16s\n", "x2", "x3", "x4", "x5", "x6")
+	// for symbol := WW; symbol <= SS; symbol++ {
+	// 	fmt.Printf("  %3s)", symbol)
+	// 	for count := 2; count <= SLOT_COL; count++ {
+	// 		fmt.Printf("  %16s", Utils.GetPercentage(rv.FGSymbolWin[symbol][count], rv.TotalBet))
+	// 	}
+	// 	fmt.Println("")
+	// }
 	// fmt.Printf("-------------------------------- %14s --------------------------------\n", "H5 Score RTP %")
 	// for i, name := range FreeGameName {
 	// 	fmt.Printf("  %s\n", name)
