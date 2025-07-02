@@ -1,86 +1,100 @@
-import multiprocessing
-import datetime
-import json
-import copy
-import os
-import random
+import multiprocessing  # 用于多进程测试，提高测试效率
+import datetime  # 用于记录测试时间和创建时间戳目录
+import json  # 用于数据序列化和反序列化
+import copy  # 用于深拷贝对象
+import os  # 用于文件和目录操作
+import random  # 用于生成随机数，模拟游戏随机性
 
-import numpy
+import numpy  # 用于计算方差等统计数据
 
-import Toad_Slot as Game_Slot
-import Toad_Config as Config
-import Slot
-import Const as Const
-import base_free_trigger_data
-import prettytable as pt
+import Toad_Slot as Game_Slot  # 导入蟾蜍老虎机游戏核心逻辑
+import Toad_Config as Config  # 导入游戏配置参数
+import Slot  # 导入基础老虎机功能
+import Const as Const  # 导入常量定义
+import base_free_trigger_data  # 导入测试数据
+import prettytable as pt  # 用于格式化输出表格
 
-
+# 统计数据字典：用于记录测试过程中的各项指标
 data = {
-    Const.S_Test_Time: 0,
+    Const.S_Test_Time: 0,  # 测试总次数
 
-    Const.S_Bet: 0,
-    Const.S_Win: 0,
+    Const.S_Bet: 0,  # 总下注额
+    Const.S_Win: 0,  # 总赢得金额
 
-    Const.S_Base_Win: 0,
-    Const.S_SC_Win: 0,
+    Const.S_Base_Win: 0,  # 基础游戏赢得金额
+    Const.S_SC_Win: 0,  # Scatter赢得金额
 
-    Const.S_Base_Hit: 0,
-    Const.S_Base_Sym_Win: {
-        Config.H1: [0, 0, 0, 0, 0, 0],
-        Config.H2: [0, 0, 0, 0, 0, 0],
-        Config.H3: [0, 0, 0, 0, 0, 0],
-        Config.H4: [0, 0, 0, 0, 0, 0],
-        Config.LA: [0, 0, 0, 0, 0, 0],
-        Config.LK: [0, 0, 0, 0, 0, 0],
-        Config.LQ: [0, 0, 0, 0, 0, 0],
-        Config.LJ: [0, 0, 0, 0, 0, 0],
+    Const.S_Base_Hit: 0,  # 基础游戏中奖次数
+    Const.S_Base_Sym_Win: {  # 各符号中奖统计（按符号类型和连线数）
+        Config.H1: [0, 0, 0, 0, 0, 0],  # H1高分符号的3连、4连、5连等中奖次数
+        Config.H2: [0, 0, 0, 0, 0, 0],  # H2高分符号
+        Config.H3: [0, 0, 0, 0, 0, 0],  # H3高分符号
+        Config.H4: [0, 0, 0, 0, 0, 0],  # H4高分符号
+        Config.LA: [0, 0, 0, 0, 0, 0],  # A符号的中奖统计
+        Config.LK: [0, 0, 0, 0, 0, 0],  # K符号的中奖统计
+        Config.LQ: [0, 0, 0, 0, 0, 0],  # Q符号的中奖统计
+        Config.LJ: [0, 0, 0, 0, 0, 0],  # J符号的中奖统计
     },
 
-    Const.S_Free_Hit: 0,
-    Const.S_Free_Win_Hit: 0,
-    Const.S_Free_Win: 0,
-    Const.S_Free_Spin: 0,
+    Const.S_Free_Hit: 0,  # 触发免费游戏次数
+    Const.S_Free_Win_Hit: 0,  # 免费游戏中有中奖的次数
+    Const.S_Free_Win: 0,  # 免费游戏总赢得金额
+    Const.S_Free_Spin: 0,  # 免费游戏总旋转次数
 
 
-    Const.S_Feature_Hit: 0,
-    'Max_Win': [0 for _ in range(40)],
-    'Max_Win_Times': 0,
-    'Variance': [0 for _ in range(40)],
-    'win_0': [0, 0, 0],
-    'win_0_1': [0, 0, 0],
-    'win_1_2': [0, 0, 0],
-    'win_2_3': [0, 0, 0],
-    'win_3_4': [0, 0, 0],
-    'win_4_5': [0, 0, 0],
-    'win_5_10': [0, 0, 0],
-    'win_10_20': [0, 0, 0],
-    'win_20_50': [0, 0, 0],
-    'win_50_100': [0, 0, 0],
-    'win_100_500': [0, 0, 0],
-    'win_500_1000': [0, 0, 0],
-    'win_1000_5000': [0, 0, 0],
-    'win_5000': [0, 0, 0],
-    'feature_0_10': 0,
-    'feature_0_10_win': 0,
-    'feature_1000_win': 0,
-    'toad_size_count': [0, 0, 0, 0, 0, 0],
-    'toad_mul_count': [0 for i in range(50)],
-    'base_wild_buff_count': 0,
-    'win_buff_times': 0,
-    'win_buff_win': 0,
-    'near_miss_count': 0,
+    Const.S_Feature_Hit: 0,  # 特殊功能触发次数
+    'Max_Win': [0 for _ in range(40)],  # 各进程记录的最大赢额倍数
+    'Max_Win_Times': 0,  # 达到限制最大赢额的次数
+    'Variance': [0 for _ in range(40)],  # 各进程的方差值
+    
+    # 不同赢额倍数区间的统计 [总体, 免费游戏, 基础野生增益]
+    'win_0': [0, 0, 0],  # 0倍赌注的次数
+    'win_0_1': [0, 0, 0],  # 0-1倍赌注的次数
+    'win_1_2': [0, 0, 0],  # 1-2倍赌注的次数
+    'win_2_3': [0, 0, 0],  # 2-3倍赌注的次数
+    'win_3_4': [0, 0, 0],  # 3-4倍赌注的次数
+    'win_4_5': [0, 0, 0],  # 4-5倍赌注的次数
+    'win_5_10': [0, 0, 0],  # 5-10倍赌注的次数
+    'win_10_20': [0, 0, 0],  # 10-20倍赌注的次数
+    'win_20_50': [0, 0, 0],  # 20-50倍赌注的次数
+    'win_50_100': [0, 0, 0],  # 50-100倍赌注的次数
+    'win_100_500': [0, 0, 0],  # 100-500倍赌注的次数
+    'win_500_1000': [0, 0, 0],  # 500-1000倍赌注的次数
+    'win_1000_5000': [0, 0, 0],  # 1000-5000倍赌注的次数
+    'win_5000': [0, 0, 0],  # 5000倍以上赌注的次数
+    
+    'feature_0_10': 0,  # 特殊功能触发但赢额小于10倍赌注的次数
+    'feature_0_10_win': 0,  # 特殊功能触发但赢额小于10倍赌注的总赢额
+    'feature_1000_win': 0,  # 特殊功能触发且赢额大于等于500倍赌注的总赢额
+    
+    # 蟾蜍特色功能相关统计
+    'toad_size_count': [0, 0, 0, 0, 0, 0],  # 蟾蜍大小统计(1-6)
+    'toad_mul_count': [0 for i in range(50)],  # 蟾蜍乘数统计(0-49)
+    'base_wild_buff_count': 0,  # 基础游戏中野生增益触发次数
+    'win_buff_times': 0,  # 赢额增益触发次数
+    'win_buff_win': 0,  # 赢额增益产生的总赢额
+    'near_miss_count': 0,  # 接近触发但未触发特殊功能的次数("近似未中")
 }
 
 
 class TestCase(object):
-
+    """测试用例类，包含测试方法和统计功能"""
 
     def test(self, test_time, total_bet, file_path, p_idx):
-        limited_win = 25000
-        free_trigger_data = []
+        """
+        标准测试方法
+        
+        参数:
+            test_time: 测试次数
+            total_bet: 每次测试的总赌注
+            file_path: 结果保存路径
+            p_idx: 进程索引
+        """
+        limited_win = 25000  # 最大赢额限制(倍数)
+        free_trigger_data = []  # 触发免费游戏的数据记录
 
         times = 0
-        win_data = []
+        win_data = []  # 记录每次旋转的赢额倍数，用于计算方差
         while times < test_time:
             times += 1
             '''进度打印'''
@@ -88,143 +102,132 @@ class TestCase(object):
                 if p_idx == 1:
                     print(f'Testing:\t{str(int(times / test_time * 100))}%')
 
-            free_trigger = 0
-            spin_total_win = 0
+            free_trigger = 0  # 免费游戏触发标记
+            spin_total_win = 0  # 本次旋转总赢额
+            
+            # 执行基础游戏旋转
             base_result = Game_Slot.GameSlot().ng_spin(total_bet, Config.Base_Reel_Choose, Config.Base_Wild_Mul)
 
-            # base_result = random.choice(base_free_trigger_data.free_trigger)
-
+            # 累加基础游戏赢额
             spin_total_win += base_result['win_amount']
-            base_wild_buff_pos = base_result['wild_buff_pos']
+            base_wild_buff_pos = base_result['wild_buff_pos']  # 野生增益位置
 
-
-            # if p_idx == 1:
-            #     print(base_result)
-
-            free_total_win = 0
-            free_spin = base_result['free_spin']
+            free_total_win = 0  # 免费游戏总赢额
+            free_spin = base_result['free_spin']  # 获得的免费旋转次数
+            
+            # 如果触发免费游戏
             if free_spin > 0:
+                # 复制蟾蜍信息并处理升级
                 toad_info = copy.deepcopy(base_result['toad_info'])
-                toad_info = Game_Slot.toad_move_upgrade(toad_info)
+                toad_info = Game_Slot.toad_move_upgrade(toad_info)  # 蟾蜍移动升级
+                toad_info = Game_Slot.toad_move_upgrade(toad_info)  # 再次升级
 
-                toad_info = Game_Slot.toad_move_upgrade(toad_info)
-
+                # 累加可能的额外免费旋转
                 if toad_info['free_spin'] > 0:
                     free_spin += toad_info['free_spin']
 
-                # if len(free_trigger_data) < 1000 and p_idx == 1:
-                #     free_trigger_data.append(base_result)
-                # else:
-                #     times = test_time
-                # if p_idx == 1:
-                #     print('\n\n\n')
-
+                # 选择免费游戏轮盘集合
                 choose_free_set_idx = Slot.rand_list(Config.Free_Set_Weight)
                 free_set = Config.Free_Set[choose_free_set_idx]
 
-            use_fg_spin = 0
-            low_win_spin = random.randint(1, 5)
+            # 执行免费游戏
+            use_fg_spin = 0  # 已使用的免费游戏次数
+            low_win_spin = random.randint(1, 5)  # 随机选择低赢额旋转
+            
             while free_spin > 0:
                 free_spin -= 1
                 use_fg_spin += 1
 
+                # 确定是否应用赢额增益
                 win_buff = 0
                 if low_win_spin == use_fg_spin:
                     win_buff = 1
+                    
+                # 执行免费游戏旋转
                 free_result = Game_Slot.GameSlot().fg_spin(total_bet, free_set, toad_info, free_spin, win_buff, free_total_win / total_bet)
-                free_total_win += free_result['win_amount']
-                free_spin += free_result['free_spin']
-                toad_info = copy.deepcopy(free_result['toad_info'])
-                free_trigger += 1
+                free_total_win += free_result['win_amount']  # 累加免费游戏赢额
+                free_spin += free_result['free_spin']  # 累加额外获得的免费旋转
+                toad_info = copy.deepcopy(free_result['toad_info'])  # 更新蟾蜍信息
+                free_trigger += 1  # 增加免费游戏计数
 
-                # if p_idx == 1:
-                #     print(use_fg_spin)
-                #     print(free_result['reel_info']['item_list'])
-                #     # for i in free_result['win_info']['lines']:
-                #     #     print(i)
-                #     print(free_result['toad_info'])
-                #     print(free_result['win_amount'])
-                #     print('\n')
-
-                '''===free 统计==='''
-                data[Const.S_Free_Spin] += 1
+                '''===免费游戏统计==='''
+                data[Const.S_Free_Spin] += 1  # 增加免费旋转计数
                 if free_result['win_amount'] > 0:
-                    data[Const.S_Free_Win_Hit] += 1
+                    data[Const.S_Free_Win_Hit] += 1  # 增加免费游戏中奖计数
 
-                toad_size = toad_info['toad_size']
-                toad_nul = toad_info['toad_mul']
-                if free_spin == 0:
-                    data['toad_size_count'][toad_size-1] += 1
-                    data['toad_mul_count'][toad_nul] += 1
+                # 统计最终蟾蜍状态
+                toad_size = toad_info['toad_size']  # 蟾蜍大小
+                toad_nul = toad_info['toad_mul']   # 蟾蜍乘数
+                if free_spin == 0:  # 如果免费游戏结束
+                    data['toad_size_count'][toad_size-1] += 1  # 记录最终蟾蜍大小
+                    data['toad_mul_count'][toad_nul] += 1     # 记录最终蟾蜍乘数
 
-
+            # 免费游戏特殊结果统计
             if free_trigger > 0:
                 if free_total_win / total_bet >= 500:
-                    data['feature_1000_win'] += free_total_win
+                    data['feature_1000_win'] += free_total_win  # 高额赢金统计
                 if free_total_win / total_bet < 10:
-                    data['feature_0_10'] += 1
-                    data['feature_0_10_win'] += free_total_win
+                    data['feature_0_10'] += 1  # 低额赢金次数
+                    data['feature_0_10_win'] += free_total_win  # 低额赢金总额
 
-            '''===base统计==='''
-            data[Const.S_Bet] += total_bet
+            '''===基础游戏统计==='''
+            data[Const.S_Bet] += total_bet  # 增加总赌注
 
-            data[Const.S_Test_Time] += 1
+            data[Const.S_Test_Time] += 1  # 增加测试次数
 
+            # 野生增益统计
             if len(base_result['wild_buff_pos']) > 0:
-                data['win_buff_times'] += 1
-                data['win_buff_win'] += base_result['win_amount']
+                data['win_buff_times'] += 1  # 增加野生增益计数
+                data['win_buff_win'] += base_result['win_amount']  # 累加野生增益赢额
 
+            # 接近未中统计
             if base_result['near_miss'] > 0:
                 data['near_miss_count'] += 1
 
+            # 基础游戏中奖统计
             if base_result['win_amount'] > 0:
                 data[Const.S_Base_Hit] += 1
 
+            # 触发免费游戏统计
             if base_result['free_spin'] > 0:
                 data[Const.S_Free_Hit] += 1
 
-
+            # 累加基础游戏赢额
             data[Const.S_Base_Win] += base_result['win_amount']
 
-            # 限制赢钱倍数
+            # 限制赢钱倍数 (防止极端大奖影响整体统计)
             if (base_result['win_amount'] + free_total_win) / total_bet > limited_win:
-                data[Const.S_Win] += limited_win * total_bet
-                data[Const.S_Free_Win] += limited_win * total_bet - base_result['win_amount']
-                spin_total_win += limited_win * total_bet - base_result['win_amount']
-                data['Max_Win_Times'] += 1
+                data[Const.S_Win] += limited_win * total_bet  # 限制总赢额
+                data[Const.S_Free_Win] += limited_win * total_bet - base_result['win_amount']  # 限制免费游戏赢额
+                spin_total_win += limited_win * total_bet - base_result['win_amount']  # 限制本次旋转总赢额
+                data['Max_Win_Times'] += 1  # 记录达到最大限制的次数
             else:
-                data[Const.S_Win] += base_result['win_amount'] + free_total_win
-                data[Const.S_Free_Win] += free_total_win
-                spin_total_win += free_total_win
+                data[Const.S_Win] += base_result['win_amount'] + free_total_win  # 累加总赢额
+                data[Const.S_Free_Win] += free_total_win  # 累加免费游戏赢额
+                spin_total_win += free_total_win  # 累加本次旋转总赢额
 
-
-
-            # # 累加单次spin + free 的总赢金
-            # data[Const.S_Win] += base_result['win_amount'] + free_total_win
-            # data[Const.S_Free_Win] += free_total_win
-            # spin_total_win += free_total_win
-
-            self.win_count(spin_total_win, total_bet, 0)
+            # 进行赢额分布统计
+            self.win_count(spin_total_win, total_bet, 0)  # 总体赢额统计
             if use_fg_spin > 0:
-                self.win_count(spin_total_win, total_bet, 1)
+                self.win_count(spin_total_win, total_bet, 1)  # 免费游戏赢额统计
 
+            # 野生增益赢额统计
             if len(base_wild_buff_pos) > 0:
-                self.win_count(spin_total_win, total_bet, 2)
-                data['base_wild_buff_count'] += 1
+                self.win_count(spin_total_win, total_bet, 2)  # 野生增益赢额统计
+                data['base_wild_buff_count'] += 1  # 增加野生增益次数
 
+            # 记录最大赢额
             if spin_total_win / total_bet > data['Max_Win'][p_idx]:
                 data['Max_Win'][p_idx] = spin_total_win / total_bet
 
+            # 记录赢额数据用于计算方差
             win_data.append(spin_total_win / total_bet)
 
+        # 计算此进程的赢额方差
         data['Variance'][p_idx] = round(numpy.std(win_data),2)
 
+        # 保存进程结果到文件
         file_name = file_path + '/' + str(p_idx) + '.txt'
-
-        # if p_idx == 1:
-        #     for i in free_trigger_data:
-        #         print(i, ',')
-
         try:
             os.remove(file_name)
         except FileNotFoundError:
@@ -234,7 +237,17 @@ class TestCase(object):
 
 
     def buy_test(self, test_time, total_bet, buy_type, file_path, p_idx):
-        limited_win = 25000
+        """
+        购买特性测试方法
+        
+        参数:
+            test_time: 测试次数
+            total_bet: 每次测试的总赌注
+            buy_type: 购买类型（1=普通免费游戏, 2=超级免费游戏）
+            file_path: 结果保存路径
+            p_idx: 进程索引
+        """
+        limited_win = 25000  # 最大赢额限制(倍数)
         # free_trigger_data = []
 
         times = 0
@@ -249,6 +262,7 @@ class TestCase(object):
             free_trigger = 0
             spin_total_win = 0
 
+            # 根据购买类型执行相应的旋转
             if buy_type == 1:
                 base_result = Game_Slot.GameSlot().buy_ng_spin(total_bet, Reel_Choose=[], wild_set=Config.Buy_Base_Set, buy_free=1, buy_super=0)
             elif buy_type == 2:
@@ -397,6 +411,14 @@ class TestCase(object):
 
 
     def win_count(self, spin_total_win, total_bet, idx):
+        """
+        赢额分布统计方法
+        
+        参数:
+            spin_total_win: 本次旋转总赢额
+            total_bet: 每次测试的总赌注
+            idx: 统计类别索引 (0=总体, 1=免费游戏, 2=野生增益)
+        """
         if spin_total_win / total_bet == 0:
             data['win_0'][idx] += 1
         elif 0 < spin_total_win / total_bet <= 1:
@@ -429,23 +451,32 @@ class TestCase(object):
 
 
 def run(test_time, total_bet, file_path, p_idx):
-    buy_type = 2
-    # TestCase().test(test_time, total_bet, file_path, p_idx)
-    TestCase().buy_test(test_time, total_bet, buy_type, file_path, p_idx)
-    print(str(p_idx) + ": Over")
+    """
+    运行测试函数，每个进程调用此函数
+    
+    参数:
+        test_time: 测试次数
+        total_bet: 总赌注
+        file_path: 结果保存路径
+        p_idx: 进程索引
+    """
+    # buy_type = 1  # 设置购买类型: 2表示购买超级免费游戏
+    TestCase().test(test_time, total_bet, file_path, p_idx)  # 标准测试(已注释)
+    # TestCase().buy_test(test_time, total_bet, buy_type, file_path, p_idx)  # 购买特性测试
+    print(str(p_idx) + ": Over")  # 打印进程完成信息
 
 
 if __name__ == '__main__':
-
+    # 程序入口：配置测试参数并启动多进程测试
     start_time = datetime.datetime.now()
-    test_time = 10000000
+    test_time = 1000000
     total_bet = 100
 
     file_list = []
-    unit_times = test_time / 25
+    unit_times = test_time / 10
 
 
-    data_store_dir = 'E:\\Run_Data\\' + start_time.strftime("%Y_%m_%d_%H_%M_%S")
+    data_store_dir = '/home/wqh/project/Slot013Numeric/Slot013Python/data/' + start_time.strftime("%Y_%m_%d_%H_%M_%S")
     os.mkdir(data_store_dir)
 
     # 创建进程列表（1-25 编号）
@@ -454,7 +485,7 @@ if __name__ == '__main__':
             target=run,
             args=(unit_times, total_bet, data_store_dir, i)  # i 为 1-25 的编号
         )
-        for i in range(1, 26)  # 生成 25 个进程
+        for i in range(1, 11)  # 生成 25 个进程
     ]
 
     # 启动所有进程

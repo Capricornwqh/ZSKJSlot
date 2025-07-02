@@ -207,7 +207,7 @@ class GameSlot(object):
                     if len(v) > 1:
                         pos_record[k] = [random.choice(v)]
 
-                choose_reel_idx = random.sample(pos_record.keys(), fg_wild_num)
+                choose_reel_idx = random.sample(list(pos_record.keys()), fg_wild_num)
 
                 for reel_idx in choose_reel_idx:
                     pos = pos_record[reel_idx][0]
