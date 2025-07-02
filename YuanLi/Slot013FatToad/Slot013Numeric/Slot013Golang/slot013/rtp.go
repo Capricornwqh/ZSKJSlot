@@ -49,9 +49,9 @@ type RTPVerifier struct {
 	Win10005000 [3]int `json:"win_1000_5000"` // 1000-5000倍赌注的次数
 	Win5000     [3]int `json:"win_5000"`      // 5000倍以上赌注的次数
 
-	Feature010     int     `json:"feature_0_10"`     // 天降横财触发但赢额小于10倍赌注的次数
-	Feature010Win  float64 `json:"feature_0_10_win"` // 天降横财触发但赢额小于10倍赌注的总赢额
-	Feature1000Win float64 `json:"feature_1000_win"` // 天降横财触发且赢额大于等于500倍赌注的总赢额
+	Feature010    int     `json:"feature_0_10"`     // 天降横财触发但赢额小于10倍赌注的次数
+	Feature010Win float64 `json:"feature_0_10_win"` // 天降横财触发但赢额小于10倍赌注的总赢额
+	Feature500Win float64 `json:"feature_500_win"`  // 天降横财触发且赢额大于等于500倍赌注的总赢额
 
 	// 蟾蜍特色功能相关统计
 	ToadSizeCount     [6]int  `json:"toad_size_count"`      // 蟾蜍大小统计(1-6)
@@ -152,7 +152,7 @@ func (rv *RTPVerifier) Run(rtp int, buyType int) {
 
 // ProcessResult 處理投注結果
 func (rv *RTPVerifier) ProcessResult(result *SlotResult) {
-	rv.TotalBet = float64(result.TotalBet)
+	rv.TotalBet = PAYLINE_TOTAL
 	rv.Variance = append(rv.Variance, float64(result.TotalWin)/rv.TotalBet)
 	rv.Bet += float64(result.TotalBet)
 	rv.Win += float64(result.TotalWin)
@@ -172,12 +172,12 @@ func (rv *RTPVerifier) ProcessResult(result *SlotResult) {
 		rv.winCount(result.TotalWin, result.TotalBet, 1)
 		if result.FreeWin > 0 {
 			rv.FreeWin += float64(result.FreeWin)
-
 			if float64(result.FreeWin)/rv.TotalBet < 10 {
 				rv.Feature010++
 				rv.Feature010Win += float64(result.FreeWin)
-			} else if float64(result.FreeWin)/rv.TotalBet >= 500 {
-				rv.Feature1000Win += float64(result.FreeWin)
+			}
+			if float64(result.FreeWin)/rv.TotalBet >= 500 {
+				rv.Feature500Win += float64(result.FreeWin)
 			}
 		}
 	}
@@ -241,13 +241,13 @@ func (rv *RTPVerifier) Dump(detail bool) {
 			float64(rv.Feature010)/float64(rv.FreeHit),
 			float64(rv.Feature010Win)/float64(rv.Bet))
 		fmt.Printf("Free win >= 500 total bet: RTP %.6f\n",
-			float64(rv.Feature1000Win)/float64(rv.Bet))
+			float64(rv.Feature500Win)/float64(rv.Bet))
 	}
 
 	fmt.Println("=============================")
 
 	// 最大赢额统计
-	fmt.Printf("Max_Win: %v\n", rv.MaxWin/rv.TotalBet)
+	fmt.Printf("Max_Win: %v\n", rv.MaxWin)
 	fmt.Printf("Max_Win Time / Test Times: %d / %d\n", rv.MaxWinTimes, rv.TotalCount)
 
 	// 计算方差

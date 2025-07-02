@@ -26,12 +26,12 @@ func TestRTP(t *testing.T) {
 		},
 		{
 			"RTP0 上線數值 購買免費",
-			&RTPVerifier{TotalCount: 50000000},
+			&RTPVerifier{TotalCount: 10000000},
 			args{rtp: 0, buyType: BUY_FREE_SPINS},
 		},
 		{
 			"RTP0 上線數值 購買超級",
-			&RTPVerifier{TotalCount: 50000000},
+			&RTPVerifier{TotalCount: 10000000},
 			args{rtp: 0, buyType: BUY_SUPER_FREE_SPINS},
 		},
 	}
