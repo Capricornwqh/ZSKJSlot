@@ -1,0 +1,67 @@
+# dev prod
+environment: dev
+
+# Configuration for the game
+game:
+  mtCount: 0
+  mcCount: 0
+  mcPrec: 0
+  defMRTP: 92.5
+
+# server configuration
+server:
+  type: "game"
+  domain: ":11001"
+
+# Configuration for geo
+geodb: E:\bakeup\ZSKJSlot\GameServerHttp\conf\i18n\GeoLite2-Country.mmdb
+
+# Configuration for i18n
+i18n:
+  default: en_US
+  dir: E:\bakeup\ZSKJSlot\GameServerHttp\conf\i18n
+
+# Configuration for database
+redis:
+  addr: 192.168.1.5:16379
+  password: W*5rE#8l7
+  db: 0
+  timeout: 3
+
+postgresql:
+  host: 192.168.1.5
+  port: 15432
+  username: heibai
+  password: P3g5R$1*b7
+  database: slotgame
+  sslmode: disable
+
+# Configuration for the email
+email:
+  addr: smtp.qq.com
+  username: waqh@qq.com
+  password: fvcrxjpxptmicahc
+  port: 587
+  from: waqh@qq.com
+
+# corn
+corn:
+  job: "0 0 2 * * *" # 每天2点执行一次
+  #job: "0 0 2 * * 1" # 每周2点执行一次
+
+# Logging configuration. The "std" logging type controls the logs being sent to
+# stdout. The "file" logging type controls logs being written to a log folder on
+# the disk. Supported log levels are "debug", "info", "warn", "error".
+logging:
+  level: debug
+
+# Configuration for Opentracing.
+tracing:
+  enabled: true
+  otlp:
+    serviceName: "localhost-slot-game"
+    endpoint: "192.168.1.5:14317"
+    insecure: true
+    samplingRatio: 1.0
+    timeout: 5
+    disabled: false

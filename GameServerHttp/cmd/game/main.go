@@ -1,0 +1,170 @@
+package main
+
+import (
+	"SlotGameServer/pkgs/controller"
+	"SlotGameServer/pkgs/service"
+	"SlotGameServer/utils"
+	utils_middleware "SlotGameServer/utils/middleware"
+	"context"
+	"flag"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
+)
+
+var (
+	verFlag    = flag.Bool("version", false, "Print version information")
+	configPath = flag.String("config", "./server.yaml", "The path to the config file. For more information, see the config file in this repository.")
+	version    string
+	buildTime  string
+	branch     string
+	commitId   string
+)
+
+func main() {
+	flag.Parse()
+
+	if *verFlag {
+		logrus.Infof("Version: %s\nBuildTime: %s\nBranch: %s\nCommitId: %s\n", version, buildTime, branch, commitId)
+		os.Exit(0)
+	}
+
+	if *configPath == "" {
+		logrus.Fatal("--config must be supplied")
+	}
+
+	// 初始化配置
+	utils.SetupConfig(*configPath)
+	// 日志配置
+	utils.SetupLogging()
+	// 初始化邮箱
+	utils.SetupEmail()
+	// 初始化数据库
+	utils.SetupPostgreSQL()
+	// 初始化Redis
+	utils.SetupRedis()
+	// 初始化Geo
+	utils.SetupGeo()
+
+	// 链路追踪
+	closer, err := utils.SetupTracing()
+	if err != nil {
+		logrus.Fatal("failed to start opentracing")
+	}
+	defer closer.Close()
+
+	r, cleanup := setupRouter()
+	defer cleanup()
+	// 创建HTTP服务器
+	srv := &http.Server{
+		Addr:    utils.Conf.Server.Domain,
+		Handler: r,
+	}
+
+	go func() {
+		logrus.Infof("Server is running at %s", utils.Conf.Server.Domain)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logrus.Fatalf("listen: %s\n", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGINT)
+	<-quit
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		logrus.Fatal("Server forced to shutdown: ", err)
+	}
+
+	logrus.Info("Server exiting")
+}
+
+func setupRouter() (*gin.Engine, func()) {
+	gin.SetMode(gin.ReleaseMode)
+	r := gin.New()
+
+	r.Use(gin.Recovery())
+
+	// 添加CORS中间件
+	// r.Use(cors.Default())
+	// 自定义CORS配置
+	corsConfig := cors.Config{
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization"},
+		AllowCredentials: false,
+		AllowAllOrigins:  true,
+		ExposeHeaders:    []string{"Content-Length", "Content-Type", "Date", "Uber-Trace-Id"},
+		MaxAge:           12 * time.Hour,
+	}
+	r.Use(cors.New(corsConfig))
+
+	r.Use(utils_middleware.AgentMiddleware())
+
+	if utils.Conf.Tracing.Enabled {
+		r.Use(utils_middleware.TracerMiddleware())
+	}
+
+	tmpGameService := &service.GameService{}
+	tmpGameService.CheckInitialization()
+
+	// API v1 路由组
+	v1 := r.Group("/v1")
+	{
+		//游戏
+		gameController := controller.NewGameController(tmpGameService)
+		gameNoAuth := v1.Group("/game")
+		{
+			gameNoAuth.POST("/new", gameController.GameNew)
+			gameNoAuth.POST("/join", gameController.GameJoin)
+			gameNoAuth.POST("/info", gameController.GameInfo)
+			gameNoAuth.POST("/rtp/get", gameController.GameRtpGet)
+		}
+		// slot
+		slotAuth := v1.Group("/slot", utils_middleware.ForceAuthMiddleware())
+		{
+			slotAuth.POST("/bet/get", gameController.SlotBetGet)
+			slotAuth.POST("/bet/set", gameController.SlotBetSet)
+			slotAuth.POST("/sel/get", gameController.SlotSelGet)
+			slotAuth.POST("/sel/set", gameController.SlotSelSet)
+			slotAuth.POST("/mode/set", gameController.SlotModeSet)
+			slotAuth.POST("/spin", gameController.SlotSpin)
+			slotAuth.POST("/doubleup", gameController.SlotDoubleup)
+			slotAuth.POST("/collect", gameController.SlotCollect)
+		}
+		// keno
+		// kenoAuth := v1.Group("/keno", utils_middleware.ForceAuthMiddleware())
+		// {
+		// 	kenoAuth.POST("/bet/get", gameController.KenoBetGet)
+		// 	kenoAuth.POST("/bet/set", gameController.KenoBetSet)
+		// 	kenoAuth.POST("/sel/get", gameController.KenoSelGet)
+		// 	kenoAuth.POST("/sel/set", gameController.KenoSelSet)
+		// 	kenoAuth.POST("/sel/getslice", gameController.KenoSelGetSlice)
+		// 	kenoAuth.POST("/sel/setslice", gameController.KenoSelSetSlice)
+		// 	kenoAuth.POST("/spin", gameController.KenoSpin)
+		// }
+	}
+
+	// 定义清理函数
+	cleanup := func() {
+		if err := utils.ClosePostgreSQL(); err != nil {
+			logrus.Error("Failed to close db: ", err)
+		}
+		if err := utils.CloseRedis(); err != nil {
+			logrus.Error("Failed to close redis: ", err)
+		}
+		if err := utils.CloseGeo(); err != nil {
+			logrus.Error("Failed to close geo: ", err)
+		}
+		logrus.Info("Cleaning up resources")
+	}
+
+	return r, cleanup
+}

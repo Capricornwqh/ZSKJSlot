@@ -1,0 +1,23 @@
+pipeline {
+    agent any
+    
+    environment {
+        VERSION = "${env.BUILD_NUMBER}"
+        COMMIT_SHA = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
+        BRANCH = sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
+        BUILD_TIME = sh(returnStdout: true, script: 'date +%Y-%m-%dT%H:%M:%S').trim()
+    }
+    
+    stages {
+        stage('Build') {
+            steps {
+                sh "docker build -f Dockerfile.user \
+                   --build-arg VERSION=${VERSION} \
+                   --build-arg COMMIT_SHA=${COMMIT_SHA} \
+                   --build-arg BRANCH=${BRANCH} \
+                   --build-arg BUILD_TIME=${BUILD_TIME} \
+                   -t zskjslot/user-service:${VERSION} ."
+            }
+        }
+    }
+}

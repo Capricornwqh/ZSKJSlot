@@ -1,0 +1,46 @@
+email_tpl:
+  change_email:
+    title:
+      other: "[{{.SiteName}}] 确认你的新邮箱地址"
+    body:
+      other: "请点击以下链接确认你在 {{.SiteName}} 上的新邮箱地址：<br>\n<a href='{{.ChangeEmailUrl}}' target='_blank'>{{.ChangeEmailUrl}}</a><br><br>\n\n如果你没有请求此更改，请忽略此邮件。\n"
+  new_answer:
+    title:
+      other: "[{{.SiteName}}] {{.DisplayName}} 回答了你的问题"
+    body:
+      other: "<a href='{{.AnswerUrl}}'>{{.QuestionTitle}}</a><br><br>\n\n{{.DisplayName}}：<br>\n<blockquote>{{.AnswerSummary}}</blockquote><br>\n<a href='{{.AnswerUrl}}'>在 {{.SiteName}} 上查看</a><br><br>\n\n--<br>\n<small><a href='{{.UnsubscribeUrl}}'>取消订阅</a></small>"
+  invited_you_to_answer:
+    title:
+      other: "[{{.SiteName}}] {{.DisplayName}} 邀请您回答问题"
+    body:
+      other: "<a href='{{.InviteUrl}}'>{{.QuestionTitle}}</a><br><br>\n\n{{.DisplayName}}：<br>\n<blockquote>我想你可能知道答案。</blockquote><br>\n<a href='{{.InviteUrl}}'>在 {{.SiteName}} 上查看</a><br><br>\n\n--<br>\n<small><a href='{{.UnsubscribeUrl}}'>取消订阅</a></small>"
+  new_comment:
+    title:
+      other: "[{{.SiteName}}] {{.DisplayName}} 评论了你的帖子"
+    body:
+      other: "<a href='{{.CommentUrl}}'>{{.QuestionTitle}}</a><br><br>\n\n{{.DisplayName}}：<br>\n<blockquote>{{.CommentSummary}}</blockquote><br>\n<a href='{{.CommentUrl}}'>在 {{.SiteName}} 上查看</a><br><br>\n\n--<br>\n<small><a href='{{.UnsubscribeUrl}}'>取消订阅</a></small>"
+  new_question:
+    title:
+      other: "[{{.SiteName}}] 新问题: {{.QuestionTitle}}"
+    body:
+      other: "<a href='{{.QuestionUrl}}'>{{.QuestionTitle}}</a><br>\n<small>{{.Tags}}</small><br><br>\n\n--<br>\n<small><a href='{{.UnsubscribeUrl}}'>取消订阅</a></small>"
+  pass_reset:
+    title:
+      other: "[{{.SiteName }}] 重置密码"
+    body:
+      other: "有人要求在 [{{.SiteName}}] 上重置你的密码。<br><br>\n\n如果这不是你的操作，请安心忽略此电子邮件。<br><br>\n\n请点击以下链接设置一个新密码：<br>\n<a href='{{.PassResetUrl}}' target='_blank'>{{.PassResetUrl}}</a>\n"
+  register:
+    title:
+      other: "[{{.SiteName}}] 确认你的新账户"
+    body:
+      other: "欢迎加入 {{.SiteName}}！<br><br>\n\n请点击以下链接确认并激活你的新账户：<br>\n<a href='{{.RegisterUrl}}' target='_blank'>{{.RegisterUrl}}</a><br><br>\n\n如果上面的链接不能点击，请将其复制并粘贴到你的浏览器地址栏中。\n"
+  verify_code:
+    title:
+      other: "[{{.SiteName}}] 验证码"
+    body:
+      other: "您的验证码是 <font color=\"#0000FF\"><u>{{.VerifyCode}}</u></font><br>\n10分钟内有效，请不要回复此邮件。\n"
+  test:
+    title:
+      other: "[{{.SiteName}}] 测试邮件"
+    body:
+      other: "这是一封测试邮件。"
