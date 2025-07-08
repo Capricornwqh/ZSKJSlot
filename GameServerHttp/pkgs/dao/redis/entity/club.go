@@ -1,4 +1,4 @@
-package redis_entity
+package entity_redis
 
 const (
 	RedisClub     = "club" // 俱乐部信息

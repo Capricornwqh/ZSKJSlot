@@ -1,7 +1,7 @@
-package pgsql_service
+package service_pgsql
 
 import (
-	pgsql_entity "SlotGameServer/pkgs/dao/postgresql/entity"
+	entity_pgsql "SlotGameServer/pkgs/dao/postgresql/entity"
 	"SlotGameServer/utils"
 	"context"
 	"fmt"
@@ -40,7 +40,7 @@ func (s *PGSQLService) do(taskName string, fn func()) {
 
 func (s *PGSQLService) checkTableExist() {
 	// gorm检查表是否存在的方法
-	s.Done = s.DB.WithContext(s.ctx).Migrator().HasTable(&pgsql_entity.Version{})
+	s.Done = s.DB.WithContext(s.ctx).Migrator().HasTable(&entity_pgsql.Version{})
 	if s.Done {
 		logrus.WithContext(s.ctx).Info("[database] already exists")
 	}
@@ -49,14 +49,14 @@ func (s *PGSQLService) checkTableExist() {
 func (s *PGSQLService) syncTable() {
 	// gorm的自动迁移方法
 	sliceTables := []any{
-		pgsql_entity.User{},
+		entity_pgsql.User{},
 	}
 	for _, table := range sliceTables {
 		var tableOptions string
 		var tableName string
 		// 根据不同表类型设置对应的comment
 		switch v := table.(type) {
-		case pgsql_entity.User:
+		case entity_pgsql.User:
 			tableOptions = v.Comment()
 			tableName = v.TableName()
 		default:
@@ -106,13 +106,13 @@ func (s *PGSQLService) expectedVersion() int64 {
 }
 
 func (s *PGSQLService) initVersionTable() {
-	s.err = s.DB.WithContext(s.ctx).Create(&pgsql_entity.Version{Id: 1, VersionNumber: s.expectedVersion()}).Error
+	s.err = s.DB.WithContext(s.ctx).Create(&entity_pgsql.Version{Id: 1, VersionNumber: s.expectedVersion()}).Error
 }
 
 // 创建Revision 每年生成下一年的表
 func (s *PGSQLService) MigrateRevision(ctx context.Context) error {
 	nowTime := time.Now()
-	tmpRecord := pgsql_entity.Record{}
+	tmpRecord := entity_pgsql.Record{}
 
 	for i := range 2 {
 		tmpTableName := fmt.Sprintf("record_%d", nowTime.Year()+i)

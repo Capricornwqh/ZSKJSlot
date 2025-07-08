@@ -1,8 +1,8 @@
-package redis_repo
+package repo_redis
 
 import (
-	pgsql_entity "SlotGameServer/pkgs/dao/postgresql/entity"
-	redis_entity "SlotGameServer/pkgs/dao/redis/entity"
+	entity_pgsql "SlotGameServer/pkgs/dao/postgresql/entity"
+	entity_redis "SlotGameServer/pkgs/dao/redis/entity"
 	"SlotGameServer/utils"
 	"fmt"
 	"strconv"
@@ -17,9 +17,9 @@ type clubRedisRepo struct {
 
 type ClubRedisRepo interface {
 	// 保存俱乐部
-	SetClub(ctx *gin.Context, club *pgsql_entity.Club) error
+	SetClub(ctx *gin.Context, club *entity_pgsql.Club) error
 	// 获取俱乐部
-	GetClub(ctx *gin.Context, cid uint64) (*pgsql_entity.Club, error)
+	GetClub(ctx *gin.Context, cid uint64) (*entity_pgsql.Club, error)
 	// 获取Name
 	GetClubName(ctx *gin.Context, cid uint64) (string, error)
 	// 获取Bank
@@ -51,13 +51,13 @@ func NewClubRedisRepo(redisClient *redis.Client) ClubRedisRepo {
 }
 
 // 保存俱乐部
-func (r *clubRedisRepo) SetClub(ctx *gin.Context, club *pgsql_entity.Club) error {
+func (r *clubRedisRepo) SetClub(ctx *gin.Context, club *entity_pgsql.Club) error {
 	if r.redisClient == nil || club == nil || club.CId <= 0 {
 		return utils.ErrParameter
 	}
 
 	err := r.redisClient.
-		HSet(ctx, fmt.Sprintf("%s:%d", redis_entity.RedisClub, club.CId), club).
+		HSet(ctx, fmt.Sprintf("%s:%d", entity_redis.RedisClub, club.CId), club).
 		Err()
 	if err != nil {
 		return err
@@ -66,14 +66,14 @@ func (r *clubRedisRepo) SetClub(ctx *gin.Context, club *pgsql_entity.Club) error
 }
 
 // 获取俱乐部
-func (r *clubRedisRepo) GetClub(ctx *gin.Context, cid uint64) (*pgsql_entity.Club, error) {
+func (r *clubRedisRepo) GetClub(ctx *gin.Context, cid uint64) (*entity_pgsql.Club, error) {
 	if r.redisClient == nil || cid <= 0 {
 		return nil, utils.ErrParameter
 	}
 
-	tmpClub := &pgsql_entity.Club{}
+	tmpClub := &entity_pgsql.Club{}
 	err := r.redisClient.
-		HGetAll(ctx, fmt.Sprintf("%s:%d", redis_entity.RedisClub, cid)).
+		HGetAll(ctx, fmt.Sprintf("%s:%d", entity_redis.RedisClub, cid)).
 		Scan(tmpClub)
 	if err != nil {
 		return nil, err
@@ -94,8 +94,8 @@ func (r *clubRedisRepo) GetClubName(ctx *gin.Context, cid uint64) (string, error
 	name, err := r.redisClient.
 		HGet(
 			ctx,
-			fmt.Sprintf("%s:%d", redis_entity.RedisClub, cid),
-			redis_entity.RedisClubName,
+			fmt.Sprintf("%s:%d", entity_redis.RedisClub, cid),
+			entity_redis.RedisClubName,
 		).Result()
 	if err != nil {
 		return "", err
@@ -112,8 +112,8 @@ func (r *clubRedisRepo) GetClubBank(ctx *gin.Context, cid uint64) (float64, erro
 	bank, err := r.redisClient.
 		HGet(
 			ctx,
-			fmt.Sprintf("%s:%d", redis_entity.RedisClub, cid),
-			redis_entity.RedisClubBank,
+			fmt.Sprintf("%s:%d", entity_redis.RedisClub, cid),
+			entity_redis.RedisClubBank,
 		).Result()
 	if err != nil {
 		return 0, err
@@ -131,8 +131,8 @@ func (r *clubRedisRepo) IncrClubBank(ctx *gin.Context, cid uint64, amount float6
 	_, err := r.redisClient.
 		HIncrByFloat(
 			ctx,
-			fmt.Sprintf("%s:%d", redis_entity.RedisClub, cid),
-			redis_entity.RedisClubBank,
+			fmt.Sprintf("%s:%d", entity_redis.RedisClub, cid),
+			entity_redis.RedisClubBank,
 			amount,
 		).Result()
 	if err != nil {
@@ -151,8 +151,8 @@ func (r *clubRedisRepo) GetClubFund(ctx *gin.Context, cid uint64) (float64, erro
 	fund, err := r.redisClient.
 		HGet(
 			ctx,
-			fmt.Sprintf("%s:%d", redis_entity.RedisClub, cid),
-			redis_entity.RedisClubFund,
+			fmt.Sprintf("%s:%d", entity_redis.RedisClub, cid),
+			entity_redis.RedisClubFund,
 		).Result()
 	if err != nil {
 		return 0, err
@@ -170,8 +170,8 @@ func (r *clubRedisRepo) IncrClubFund(ctx *gin.Context, cid uint64, amount float6
 	_, err := r.redisClient.
 		HIncrByFloat(
 			ctx,
-			fmt.Sprintf("%s:%d", redis_entity.RedisClub, cid),
-			redis_entity.RedisClubFund,
+			fmt.Sprintf("%s:%d", entity_redis.RedisClub, cid),
+			entity_redis.RedisClubFund,
 			amount,
 		).Result()
 	if err != nil {
@@ -190,8 +190,8 @@ func (r *clubRedisRepo) GetClubLock(ctx *gin.Context, cid uint64) (float64, erro
 	lock, err := r.redisClient.
 		HGet(
 			ctx,
-			fmt.Sprintf("%s:%d", redis_entity.RedisClub, cid),
-			redis_entity.RedisClubLock,
+			fmt.Sprintf("%s:%d", entity_redis.RedisClub, cid),
+			entity_redis.RedisClubLock,
 		).Result()
 	if err != nil {
 		return 0, err
@@ -209,8 +209,8 @@ func (r *clubRedisRepo) IncrClubLock(ctx *gin.Context, cid uint64, amount float6
 	_, err := r.redisClient.
 		HIncrByFloat(
 			ctx,
-			fmt.Sprintf("%s:%d", redis_entity.RedisClub, cid),
-			redis_entity.RedisClubLock,
+			fmt.Sprintf("%s:%d", entity_redis.RedisClub, cid),
+			entity_redis.RedisClubLock,
 			amount,
 		).Result()
 	if err != nil {
@@ -228,10 +228,10 @@ func (r *clubRedisRepo) GetCash(ctx *gin.Context, cid uint64) (float64, float64,
 
 	values, err := r.redisClient.HMGet(
 		ctx,
-		fmt.Sprintf("%s:%d", redis_entity.RedisClub, cid),
-		redis_entity.RedisClubBank,
-		redis_entity.RedisClubFund,
-		redis_entity.RedisClubLock).Result()
+		fmt.Sprintf("%s:%d", entity_redis.RedisClub, cid),
+		entity_redis.RedisClubBank,
+		entity_redis.RedisClubFund,
+		entity_redis.RedisClubLock).Result()
 
 	if err != nil {
 		return 0, 0, 0, err
@@ -303,8 +303,8 @@ func (r *clubRedisRepo) GetClubRate(ctx *gin.Context, cid uint64) (float64, erro
 	rate, err := r.redisClient.
 		HGet(
 			ctx,
-			fmt.Sprintf("%s:%d", redis_entity.RedisClub, cid),
-			redis_entity.RedisClubRate,
+			fmt.Sprintf("%s:%d", entity_redis.RedisClub, cid),
+			entity_redis.RedisClubRate,
 		).Result()
 	if err != nil {
 		return 0, err
@@ -322,8 +322,8 @@ func (r *clubRedisRepo) GetClubMRTP(ctx *gin.Context, cid uint64) (float64, erro
 	mrtp, err := r.redisClient.
 		HGet(
 			ctx,
-			fmt.Sprintf("%s:%d", redis_entity.RedisClub, cid),
-			redis_entity.RedisClubMRTP,
+			fmt.Sprintf("%s:%d", entity_redis.RedisClub, cid),
+			entity_redis.RedisClubMRTP,
 		).Result()
 	if err != nil {
 		return 0, err

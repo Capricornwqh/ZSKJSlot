@@ -1,8 +1,8 @@
 package utils_middleware
 
 import (
-	redis_entity "SlotGameServer/pkgs/dao/redis/entity"
-	redis_repo "SlotGameServer/pkgs/dao/redis/repo"
+	entity_redis "SlotGameServer/pkgs/dao/redis/entity"
+	repo_redis "SlotGameServer/pkgs/dao/redis/repo"
 	"SlotGameServer/utils"
 	"crypto/md5"
 	"fmt"
@@ -25,7 +25,7 @@ func RepeatedMiddleware() gin.HandlerFunc {
 
 		md5Id := ""
 		hMD5 := md5.New()
-		_, err := io.WriteString(hMD5, fmt.Sprintf("%s:%d%s", redis_entity.RedisMethodMD5, tmpUserId, ctx.FullPath()))
+		_, err := io.WriteString(hMD5, fmt.Sprintf("%s:%d%s", entity_redis.RedisMethodMD5, tmpUserId, ctx.FullPath()))
 		if err != nil {
 			logrus.WithContext(ctx).Error(err)
 			utils.HandleError(ctx, utils.ErrParse)
@@ -33,7 +33,7 @@ func RepeatedMiddleware() gin.HandlerFunc {
 		}
 		md5Id = fmt.Sprintf("%x", hMD5.Sum(nil))
 		if utils.RedisClient != nil {
-			value, err := redis_repo.GetMethodMD5(ctx, md5Id)
+			value, err := repo_redis.GetMethodMD5(ctx, md5Id)
 			if err != nil && err != utils.Nil {
 				logrus.WithContext(ctx).Error(err)
 				utils.HandleError(ctx, utils.ErrUserNotFound)
@@ -44,7 +44,7 @@ func RepeatedMiddleware() gin.HandlerFunc {
 				utils.HandleError(ctx, utils.ErrRepeated)
 				return
 			}
-			err = redis_repo.SetMethodMD5(ctx, md5Id, "1", redis_entity.TimeMethodMD5*time.Second)
+			err = repo_redis.SetMethodMD5(ctx, md5Id, "1", entity_redis.TimeMethodMD5*time.Second)
 			if err != nil {
 				logrus.WithContext(ctx).Error(err)
 				utils.HandleError(ctx, utils.ErrOperation)
@@ -55,7 +55,7 @@ func RepeatedMiddleware() gin.HandlerFunc {
 		ctx.Next()
 
 		if md5Id != "" {
-			redis_repo.DelMethodMD5(ctx, md5Id)
+			repo_redis.DelMethodMD5(ctx, md5Id)
 		}
 	}
 }

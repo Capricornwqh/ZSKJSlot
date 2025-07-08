@@ -1,11 +1,11 @@
 package main
 
 import (
-	"SlotGameServer/pkgs/controller"
+	controller_user "SlotGameServer/pkgs/controller/user"
 	i18n_repo "SlotGameServer/pkgs/dao/i18n/repo"
-	pgsql_repo "SlotGameServer/pkgs/dao/postgresql/repo"
-	redis_repo "SlotGameServer/pkgs/dao/redis/repo"
-	"SlotGameServer/pkgs/service"
+	repo_pgsql "SlotGameServer/pkgs/dao/postgresql/repo"
+	repo_redis "SlotGameServer/pkgs/dao/redis/repo"
+	service_user "SlotGameServer/pkgs/service/user"
 	"SlotGameServer/utils"
 	utils_middleware "SlotGameServer/utils/middleware"
 	"context"
@@ -115,10 +115,10 @@ func setupRouter() (*gin.Engine, func()) {
 		r.Use(utils_middleware.TracerMiddleware())
 	}
 
-	tmpUserService := &service.UserService{
-		VerifyCodeRedisRepo: redis_repo.NewVerifyCodeRedisRepo(utils.RedisClient),
-		UserDBRepo:          pgsql_repo.NewUserDBRepo(utils.PostgreSQLDB),
-		UserRedisRepo:       redis_repo.NewUserRedisRepo(utils.RedisClient),
+	tmpUserService := &service_user.UserService{
+		VerifyCodeRedisRepo: repo_redis.NewVerifyCodeRedisRepo(utils.RedisClient),
+		UserDBRepo:          repo_pgsql.NewUserDBRepo(utils.PostgreSQLDB),
+		UserRedisRepo:       repo_redis.NewUserRedisRepo(utils.RedisClient),
 		EmailI18NRepo:       i18n_repo.NewEmailI18NRepo(utils.I18nTranslator),
 	}
 	tmpUserService.CheckInitialization()
@@ -127,7 +127,7 @@ func setupRouter() (*gin.Engine, func()) {
 	v1 := r.Group("/v1")
 	{
 		//用户
-		userController := controller.NewUserController(tmpUserService)
+		userController := controller_user.NewUserController(tmpUserService)
 		userNoAuth := v1.Group("/user")
 		{
 			userNoAuth.POST("/signup", userController.SignUp)

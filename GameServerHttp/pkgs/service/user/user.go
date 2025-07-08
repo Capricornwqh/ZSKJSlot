@@ -1,12 +1,12 @@
-package service
+package service_user
 
 import (
 	i18n_repo "SlotGameServer/pkgs/dao/i18n/repo"
-	pgsql_entity "SlotGameServer/pkgs/dao/postgresql/entity"
-	pgsql_repo "SlotGameServer/pkgs/dao/postgresql/repo"
-	redis_entity "SlotGameServer/pkgs/dao/redis/entity"
-	redis_repo "SlotGameServer/pkgs/dao/redis/repo"
-	"SlotGameServer/pkgs/model"
+	entity_pgsql "SlotGameServer/pkgs/dao/postgresql/entity"
+	repo_pgsql "SlotGameServer/pkgs/dao/postgresql/repo"
+	entity_redis "SlotGameServer/pkgs/dao/redis/entity"
+	repo_redis "SlotGameServer/pkgs/dao/redis/repo"
+	model "SlotGameServer/pkgs/model/user"
 	"SlotGameServer/utils"
 	utils_middleware "SlotGameServer/utils/middleware"
 	"reflect"
@@ -18,9 +18,9 @@ import (
 )
 
 type UserService struct {
-	VerifyCodeRedisRepo redis_repo.VerifyCodeRedisRepo
-	UserDBRepo          pgsql_repo.UserDBRepo
-	UserRedisRepo       redis_repo.UserRedisRepo
+	VerifyCodeRedisRepo repo_redis.VerifyCodeRedisRepo
+	UserDBRepo          repo_pgsql.UserDBRepo
+	UserRedisRepo       repo_redis.UserRedisRepo
 	EmailI18NRepo       i18n_repo.EmailI18NRepo
 }
 
@@ -38,7 +38,7 @@ func (s *UserService) CheckInitialization() {
 }
 
 // 获取用户的redis数据
-func (s *UserService) GetUser(ctx *gin.Context) (*pgsql_entity.User, error) {
+func (s *UserService) GetUser(ctx *gin.Context) (*entity_pgsql.User, error) {
 	tmpUserId := ctx.GetUint64(utils_middleware.CONTEXT_USERID)
 	if tmpUserId <= 0 {
 		return nil, utils.ErrUserNotFound
@@ -56,7 +56,7 @@ func (s *UserService) GetUser(ctx *gin.Context) (*pgsql_entity.User, error) {
 			}
 
 			//设置reids
-			err = s.UserRedisRepo.SetUser(ctx, tmpUser, redis_entity.TimeUserBase*time.Second)
+			err = s.UserRedisRepo.SetUser(ctx, tmpUser, entity_redis.TimeUserBase*time.Second)
 			if err != nil {
 				logrus.WithContext(ctx).Error(err)
 				return nil, utils.ErrOperation
@@ -82,7 +82,7 @@ func (s *UserService) VerifyEmail(ctx *gin.Context, lang, email string) error {
 			return utils.ErrParse
 		}
 		code = strconv.Itoa(result)
-		err = s.VerifyCodeRedisRepo.SetVerifyCode(ctx, email, code, redis_entity.TimeVerifyCode*time.Second)
+		err = s.VerifyCodeRedisRepo.SetVerifyCode(ctx, email, code, entity_redis.TimeVerifyCode*time.Second)
 		if err != nil {
 			logrus.WithContext(ctx).Error(err)
 			return utils.ErrOperation
@@ -148,14 +148,14 @@ func (s *UserService) EmailSignUp(ctx *gin.Context, req *model.UserSignRequest) 
 		logrus.WithContext(ctx).Error(err)
 		return nil, utils.ErrOperation
 	}
-	tmpUser = &pgsql_entity.User{
+	tmpUser = &entity_pgsql.User{
 		DeletedAt:     nowTime,
 		CreatedAt:     nowTime,
 		UpdatedAt:     nowTime,
 		LastLoginDate: nowTime,
 		EMail:         req.Object,
 		Username:      req.Username,
-		Status:        pgsql_entity.UFactivated,
+		Status:        entity_pgsql.UFactivated,
 		Pass:          tmpPassword,
 		IPInfo:        ctx.ClientIP(),
 		Device:        req.Device,
@@ -179,7 +179,7 @@ func (s *UserService) EmailSignUp(ctx *gin.Context, req *model.UserSignRequest) 
 	}
 
 	//设置reids
-	err = s.UserRedisRepo.SetUser(ctx, tmpUser, redis_entity.TimeUserBase*time.Second)
+	err = s.UserRedisRepo.SetUser(ctx, tmpUser, entity_redis.TimeUserBase*time.Second)
 	if err != nil {
 		logrus.WithContext(ctx).Error(err)
 		return nil, utils.ErrOperation
@@ -224,7 +224,7 @@ func (s *UserService) EmailSignIn(ctx *gin.Context, req *model.UserSignRequest) 
 		return nil, utils.ErrParameter
 	}
 
-	if tmpUser.Status > pgsql_entity.UFsuspended {
+	if tmpUser.Status > entity_pgsql.UFsuspended {
 		logrus.WithContext(ctx).Error(utils.ErrAccountAvailable)
 		return nil, utils.ErrAccountAvailable
 	}
@@ -255,7 +255,7 @@ func (s *UserService) EmailSignIn(ctx *gin.Context, req *model.UserSignRequest) 
 	}
 
 	//设置reids
-	err = s.UserRedisRepo.SetUser(ctx, tmpUser, redis_entity.TimeUserBase*time.Second)
+	err = s.UserRedisRepo.SetUser(ctx, tmpUser, entity_redis.TimeUserBase*time.Second)
 	if err != nil {
 		logrus.WithContext(ctx).Error(err)
 		return nil, utils.ErrOperation
@@ -303,7 +303,7 @@ func (s *UserService) AccountSignIn(ctx *gin.Context, req *model.UserSignRequest
 		logrus.WithContext(ctx).Error(err)
 		return nil, utils.ErrUserNotFound
 	} else {
-		if tmpUser.Status > pgsql_entity.UFsuspended {
+		if tmpUser.Status > entity_pgsql.UFsuspended {
 			logrus.WithContext(ctx).Error(utils.ErrAccountAvailable)
 			return nil, utils.ErrAccountAvailable
 		}
@@ -335,7 +335,7 @@ func (s *UserService) AccountSignIn(ctx *gin.Context, req *model.UserSignRequest
 	}
 
 	//设置reids
-	err = s.UserRedisRepo.SetUser(ctx, tmpUser, redis_entity.TimeUserBase*time.Second)
+	err = s.UserRedisRepo.SetUser(ctx, tmpUser, entity_redis.TimeUserBase*time.Second)
 	if err != nil {
 		logrus.WithContext(ctx).Error(err)
 		return nil, utils.ErrOperation
@@ -364,7 +364,7 @@ func (s *UserService) GetProfile(ctx *gin.Context) (*model.UserBaseInfo, error) 
 		logrus.WithContext(ctx).Error(err)
 		return nil, utils.ErrUserNotFound
 	}
-	if tmpUser.Status > pgsql_entity.UFsuspended {
+	if tmpUser.Status > entity_pgsql.UFsuspended {
 		logrus.WithContext(ctx).Error(utils.ErrAccountAvailable)
 		return nil, utils.ErrAccountAvailable
 	}

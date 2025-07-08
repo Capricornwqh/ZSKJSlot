@@ -1,4 +1,4 @@
-package redis_entity
+package entity_redis
 
 const TimeMethodMD5 = 5 //重复提交过期时间（秒）
 

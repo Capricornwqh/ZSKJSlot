@@ -1,8 +1,8 @@
-package controller
+package controller_user
 
 import (
-	"SlotGameServer/pkgs/model"
-	"SlotGameServer/pkgs/service"
+	model "SlotGameServer/pkgs/model/user"
+	service "SlotGameServer/pkgs/service/user"
 	"SlotGameServer/utils"
 	"net/http"
 

@@ -1,4 +1,4 @@
-package redis_entity
+package entity_redis
 
 const TimeVerifyCode = 600 //验证码过期时间（秒）
 

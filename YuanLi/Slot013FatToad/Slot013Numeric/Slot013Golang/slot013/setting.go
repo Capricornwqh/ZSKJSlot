@@ -81,17 +81,33 @@ const (
 
 // 測試指令資料 index
 const (
-	DEBUG_INDEX_GROUP_INDEX   = iota // 主遊戲轉輪群組 index (0~5)
-	DEBUG_INDEX_REEL_INDEX_01        // 停輪位置
-	DEBUG_INDEX_REEL_INDEX_02
-	DEBUG_INDEX_REEL_INDEX_03
-	DEBUG_INDEX_REEL_INDEX_04
-	DEBUG_INDEX_REEL_INDEX_05
-	DEBUG_INDEX_REEL_INDEX_06
-	DEBUG_INDEX_COVER_SCATTER_COUNT // 主遊戲覆蓋 Scatter 獎圖數量 (3~5)
-	DEBUG_INDEX_FREE_GAME_TYPE      // 免費遊戲類型 (即免費遊戲的轉輪群組 index, 0~1)
-	DEBUG_INDEX_COVER_WILD_COUNT    // 免費遊戲覆蓋 Wild 數量 (0~2)
-	DEBUG_INDEX_PERFORMANCE_TYPE    // 表演類型 (主遊戲: 0~1，免費遊戲: 0~3)
+	DEBUG_MAIN_GROUP_INDEX         = iota // 主遊戲轉輪群組 index (0~3)
+	DEBUG_MAIN_REEL_INDEX_01              // 主游戏1轴停輪位置
+	DEBUG_MAIN_REEL_INDEX_02              // 主游戏2轴停輪位置
+	DEBUG_MAIN_REEL_INDEX_03              // 主游戏3轴停輪位置
+	DEBUG_MAIN_REEL_INDEX_04              // 主游戏4轴停輪位置
+	DEBUG_MAIN_REEL_INDEX_05              // 主游戏5轴停輪位置
+	DEBUG_MAIN_REEL_INDEX_06              // 主游戏6轴停輪位置
+	DEBUG_MAIN_FEATURE_COUNT              // 主遊戲天降横财铜钱數量 (0~4)
+	DEBUG_MAIN_FEATURE_MULTIPLE_01        // 主遊戲天降横财铜钱1倍数
+	DEBUG_MAIN_FEATURE_MULTIPLE_02        // 主遊戲天降横财铜钱2倍数
+	DEBUG_MAIN_FEATURE_MULTIPLE_03        // 主遊戲天降横财铜钱3倍数
+	DEBUG_MAIN_FEATURE_MULTIPLE_04        // 主遊戲天降横财铜钱4倍数
+	DEBUG_MAIN_FEATURE_MULTIPLE_05        // 主遊戲天降横财铜钱5倍数
+	DEBUG_FREE_GROUP_INDEX                // 免費遊戲遊戲轉輪群組 index (0~4)
+	DEBUG_FREE_REEL_INDEX_01              // 免費遊戲1轴停輪位置
+	DEBUG_FREE_REEL_INDEX_02              // 免費遊戲2轴停輪位置
+	DEBUG_FREE_REEL_INDEX_03              // 免費遊戲3轴停輪位置
+	DEBUG_FREE_REEL_INDEX_04              // 免費遊戲4轴停輪位置
+	DEBUG_FREE_REEL_INDEX_05              // 免費遊戲5轴停輪位置
+	DEBUG_FREE_REEL_INDEX_06              // 免費遊戲6轴停輪位置
+	DEBUG_FREE_FEATURE_COUNT              // 免费遊戲天降横财铜钱數量 (0~4)
+	DEBUG_FREE_FEATURE_MULTIPLE_01        // 免費遊戲天降横财铜钱1倍数
+	DEBUG_FREE_FEATURE_MULTIPLE_02        // 免費遊戲天降横财铜钱2倍数
+	DEBUG_FREE_FEATURE_MULTIPLE_03        // 免費遊戲天降横财铜钱3倍数
+	DEBUG_FREE_FEATURE_MULTIPLE_04        // 免費遊戲天降横财铜钱4倍数
+	DEBUG_FREE_FEATURE_MULTIPLE_05        // 免費遊戲天降横财铜钱5倍数
+	DEBUG_MY_SYMBOL_INDEX                 // My符號索引 (0~3)
 )
 
 // 主遊戲 PerformanceType 表演類型

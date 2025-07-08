@@ -1,4 +1,4 @@
-package redis_repo
+package repo_redis
 
 import (
 	"SlotGameServer/utils"

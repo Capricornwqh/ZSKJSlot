@@ -1,4 +1,4 @@
-package pgsql_entity
+package entity_pgsql
 
 import (
 	"database/sql/driver"

@@ -1,7 +1,7 @@
-package redis_repo
+package repo_redis
 
 import (
-	redis_entity "SlotGameServer/pkgs/dao/redis/entity"
+	entity_redis "SlotGameServer/pkgs/dao/redis/entity"
 	"SlotGameServer/utils"
 	"time"
 
@@ -36,7 +36,7 @@ func (r *verifyCodeRedisRepo) SetVerifyCode(ctx *gin.Context, key, code string, 
 		return utils.ErrParameter
 	}
 
-	err := r.redisClient.Set(ctx, redis_entity.RedisVerifyCode+key, code, expiration).Err()
+	err := r.redisClient.Set(ctx, entity_redis.RedisVerifyCode+key, code, expiration).Err()
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func (r *verifyCodeRedisRepo) GetVerifyCode(ctx *gin.Context, key string) (strin
 		return "", utils.ErrParameter
 	}
 
-	value, err := r.redisClient.Get(ctx, redis_entity.RedisVerifyCode+key).Result()
+	value, err := r.redisClient.Get(ctx, entity_redis.RedisVerifyCode+key).Result()
 	if err != nil {
 		return "", utils.ErrDataNotFound
 	}
@@ -63,7 +63,7 @@ func (r *verifyCodeRedisRepo) GetDelVerifyCode(ctx *gin.Context, key string) (st
 		return "", utils.ErrParameter
 	}
 
-	value, err := r.redisClient.GetDel(ctx, redis_entity.RedisVerifyCode+key).Result()
+	value, err := r.redisClient.GetDel(ctx, entity_redis.RedisVerifyCode+key).Result()
 	if err != nil {
 		return "", err
 	}
@@ -77,7 +77,7 @@ func (r *verifyCodeRedisRepo) DelVerifyCode(ctx *gin.Context, key string) error 
 		return utils.ErrParameter
 	}
 
-	err := r.redisClient.Del(ctx, redis_entity.RedisVerifyCode+key).Err()
+	err := r.redisClient.Del(ctx, entity_redis.RedisVerifyCode+key).Err()
 	if err != nil {
 		return err
 	}

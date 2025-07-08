@@ -1,8 +1,8 @@
-package redis_repo
+package repo_redis
 
 import (
-	pgsql_entity "SlotGameServer/pkgs/dao/postgresql/entity"
-	redis_entity "SlotGameServer/pkgs/dao/redis/entity"
+	entity_pgsql "SlotGameServer/pkgs/dao/postgresql/entity"
+	entity_redis "SlotGameServer/pkgs/dao/redis/entity"
 	"SlotGameServer/utils"
 	"fmt"
 	"strconv"
@@ -17,7 +17,7 @@ type propsRedisRepo struct {
 
 type PropsRedisRepo interface {
 	// 保存属性
-	SetProps(ctx *gin.Context, club *pgsql_entity.Props) error
+	SetProps(ctx *gin.Context, club *entity_pgsql.Props) error
 	// 获取钱包余额
 	GetWallet(ctx *gin.Context, uId, cId uint64) (float64, error)
 	// 获取访问权限
@@ -33,13 +33,13 @@ func NewPropsRedisRepo(redisClient *redis.Client) PropsRedisRepo {
 }
 
 // 保存属性
-func (r *propsRedisRepo) SetProps(ctx *gin.Context, props *pgsql_entity.Props) error {
+func (r *propsRedisRepo) SetProps(ctx *gin.Context, props *entity_pgsql.Props) error {
 	if r.redisClient == nil || props == nil || props.CId <= 0 || props.UId <= 0 {
 		return utils.ErrParameter
 	}
 
 	err := r.redisClient.
-		HSet(ctx, fmt.Sprintf("%s:%d:%d", redis_entity.RedisProps, props.UId, props.CId), props).
+		HSet(ctx, fmt.Sprintf("%s:%d:%d", entity_redis.RedisProps, props.UId, props.CId), props).
 		Err()
 	if err != nil {
 		return err
@@ -56,8 +56,8 @@ func (r *propsRedisRepo) GetWallet(ctx *gin.Context, uId, cId uint64) (float64, 
 	walletStr, err := r.redisClient.
 		HGet(
 			ctx,
-			fmt.Sprintf("%s:%d:%d", redis_entity.RedisProps, uId, cId),
-			redis_entity.RedisPropsWallet,
+			fmt.Sprintf("%s:%d:%d", entity_redis.RedisProps, uId, cId),
+			entity_redis.RedisPropsWallet,
 		).Result()
 	if err != nil {
 		return 0, err
@@ -75,8 +75,8 @@ func (r *propsRedisRepo) GetAL(ctx *gin.Context, uId, cId uint64) (uint64, error
 	alStr, err := r.redisClient.
 		HGet(
 			ctx,
-			fmt.Sprintf("%s:%d:%d", redis_entity.RedisProps, uId, cId),
-			redis_entity.RedisPropsAL,
+			fmt.Sprintf("%s:%d:%d", entity_redis.RedisProps, uId, cId),
+			entity_redis.RedisPropsAL,
 		).Result()
 	if err != nil {
 		return 0, err
@@ -94,8 +94,8 @@ func (r *propsRedisRepo) GetMRTP(ctx *gin.Context, uId, cId uint64) (float64, er
 	mrtpStr, err := r.redisClient.
 		HGet(
 			ctx,
-			fmt.Sprintf("%s:%d:%d", redis_entity.RedisProps, uId, cId),
-			redis_entity.RedisPropsMRTP,
+			fmt.Sprintf("%s:%d:%d", entity_redis.RedisProps, uId, cId),
+			entity_redis.RedisPropsMRTP,
 		).Result()
 	if err != nil {
 		return 0, err

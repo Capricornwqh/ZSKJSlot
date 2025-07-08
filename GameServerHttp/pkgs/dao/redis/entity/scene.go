@@ -1,6 +1,6 @@
-package redis_entity
+package entity_redis
 
-import pgsql_entity "SlotGameServer/pkgs/dao/postgresql/entity"
+import entity_pgsql "SlotGameServer/pkgs/dao/postgresql/entity"
 
 const (
 	RedisScene = "scene" // 场景信息
@@ -10,5 +10,5 @@ const (
 type Scene struct {
 	SId                uint64     `json:"sid"`  // 最新旋转ID
 	Game               any        `json:"game"` // 游戏实例
-	pgsql_entity.Story `json:"-"` // 嵌入游戏故事信息
+	entity_pgsql.Story `json:"-"` // 嵌入游戏故事信息
 }

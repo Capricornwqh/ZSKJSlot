@@ -1,4 +1,4 @@
-package model
+package model_arcade
 
 type GameArg struct {
 	CID   uint64 `json:"cid" yaml:"cid" form:"cid" binding:"required"`

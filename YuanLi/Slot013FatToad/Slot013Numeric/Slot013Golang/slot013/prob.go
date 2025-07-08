@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"math/rand/v2"
-	"os"
 	"slices"
 	"sort"
 )
@@ -47,7 +46,11 @@ func (slot *SlotProb) Run(rtp int, lineBet int, result *SlotResult, debugCmdList
 	maxWin := uint64(lineBet * PAYLINE_TOTAL * MAX_ODDS)
 	result.WWMultiplier = 0
 	tumbleResult := &TumbleResult{}
-	result.MGGroupIndex, result.Code, result.WWWild, result.SSWild = slot.RandMGSymbol(rtp, buyType, lineBet, tumbleResult, nil)
+	var debugCmd *DebugCmd
+	if len(debugCmdList) > 0 {
+		debugCmd = &debugCmdList[0]
+	}
+	result.MGGroupIndex, result.Code, result.WWWild, result.SSWild = slot.RandMGSymbol(rtp, buyType, lineBet, tumbleResult, debugCmd)
 	// 有發生錯誤則直接結束
 	if result.Code != ERROR_CODE_OK {
 		return result.GameMode
@@ -72,6 +75,11 @@ func (slot *SlotProb) Run(rtp int, lineBet int, result *SlotResult, debugCmdList
 		}
 
 		count := RandChoiceByWeight(MGFeatureSSList, MGFeatureSSWT)
+		if debugCmd != nil {
+			if len(debugCmd.DebugData) > DEBUG_MAIN_FEATURE_COUNT {
+				count = uint(debugCmd.DebugData[DEBUG_MAIN_FEATURE_COUNT])
+			}
+		}
 
 		// 随机选择一条中奖线
 		lineIndex := rand.IntN(len(LineIndexArray))
@@ -105,9 +113,30 @@ func (slot *SlotProb) Run(rtp int, lineBet int, result *SlotResult, debugCmdList
 			col, row := position[0], position[1]
 
 			// 放置铜钱
-			tumbleSymbol[col][row] = slot.getMainWildMulti(result.BuyType, result.MGGroupIndex)
+			coinSymbol := slot.getMainWildMulti(result.BuyType, result.MGGroupIndex)
+
+			// 调试控制铜钱倍数
+			if debugCmd != nil {
+				multipleIndex := DEBUG_MAIN_FEATURE_MULTIPLE_01 + i
+				if len(debugCmd.DebugData) > multipleIndex {
+					switch debugCmd.DebugData[multipleIndex] {
+					case 0:
+						coinSymbol = SS
+					case 2:
+						coinSymbol = SS2
+					case 3:
+						coinSymbol = SS3
+					case 5:
+						coinSymbol = SS5
+					default:
+						// 保持原有逻辑
+					}
+				}
+			}
+
+			tumbleSymbol[col][row] = coinSymbol
 			result.SSWild = append(result.SSWild, &WildStruct{
-				WildSymbol:     tumbleSymbol[col][row],
+				WildSymbol:     coinSymbol,
 				WildCoordinate: [2]int{col, row},
 			})
 		}
@@ -301,9 +330,30 @@ func (slot *SlotProb) Run(rtp int, lineBet int, result *SlotResult, debugCmdList
 						position := availablePositions[col][randomIndex]
 
 						// 放置铜钱
-						tumbleSymbol[position[0]][position[1]] = slot.getFreeWildMulti(result.BuyType, result.FGIndex)
+						coinSymbol := slot.getFreeWildMulti(result.BuyType, result.FGIndex)
+
+						// 调试控制铜钱倍数
+						if debugCmd != nil {
+							multipleIndex := DEBUG_FREE_FEATURE_MULTIPLE_01 + i
+							if len(debugCmd.DebugData) > multipleIndex {
+								switch debugCmd.DebugData[multipleIndex] {
+								case 0:
+									coinSymbol = SS
+								case 2:
+									coinSymbol = SS2
+								case 3:
+									coinSymbol = SS3
+								case 5:
+									coinSymbol = SS5
+								default:
+									// 保持原有逻辑
+								}
+							}
+						}
+
+						tumbleSymbol[position[0]][position[1]] = coinSymbol
 						result.SSWild = append(result.SSWild, &WildStruct{
-							WildSymbol:     tumbleSymbol[position[0]][position[1]],
+							WildSymbol:     coinSymbol,
 							WildCoordinate: position,
 						})
 					}
@@ -880,6 +930,17 @@ func (slot *SlotProb) RandMGSymbol(rtp int, buyType int, lineBet int, tumbleResu
 		fmt.Printf("[ERROR] RandMGSymbol: RTP = %d, BuyType = %d, MGReelGroupRoulette spin failed.\n", rtp, buyType)
 		return -1, ERROR_CODE_ROULETTE_SPIN_FAILED, nil, nil
 	}
+	// 處理測試指令
+	var debugReelIndex []int
+	if debugCmd != nil {
+		// 取得轉輪群組 index，並檢查是否合法
+		if len(debugCmd.DebugData) > DEBUG_MAIN_GROUP_INDEX && 0 <= debugCmd.DebugData[DEBUG_MAIN_GROUP_INDEX] && debugCmd.DebugData[DEBUG_MAIN_GROUP_INDEX] < len(MGReelGroup[rtp]) {
+			groupIdx = debugCmd.DebugData[DEBUG_MAIN_GROUP_INDEX]
+		}
+		if len(debugCmd.DebugData) > DEBUG_MAIN_REEL_INDEX_06 {
+			debugReelIndex = debugCmd.DebugData[DEBUG_MAIN_REEL_INDEX_01 : DEBUG_MAIN_REEL_INDEX_06+1]
+		}
+	}
 	reelGroup := MGReelGroup[rtp][groupIdx]
 
 	tmpWWWild := make([]*WildStruct, 0)
@@ -893,6 +954,10 @@ func (slot *SlotProb) RandMGSymbol(rtp int, buyType int, lineBet int, tumbleResu
 		reel := reelGroup[col]
 		reelLength := len(reel)
 		dice := rand.IntN(reelLength)
+		// 處理測試指令中的停輪位置，並檢查是否合法
+		if debugReelIndex != nil && 0 <= debugReelIndex[col] && debugReelIndex[col] < reelLength {
+			dice = debugReelIndex[col]
+		}
 		columnSymbol := make(ReelSymbol, SLOT_ROW)
 		for row := range SLOT_ROW {
 			idx := dice + row
@@ -961,11 +1026,11 @@ func (slot *SlotProb) RandFGSymbol(rtp int, buyType int, lineBet int, spinResult
 	var debugReelIndex []int
 	if debugCmd != nil {
 		// 取得轉輪群組 index，並檢查是否合法
-		if len(debugCmd.DebugData) > DEBUG_INDEX_GROUP_INDEX && 0 <= debugCmd.DebugData[DEBUG_INDEX_GROUP_INDEX] && debugCmd.DebugData[DEBUG_INDEX_GROUP_INDEX] < len(MGReelGroup[rtp]) {
-			groupIdx = debugCmd.DebugData[DEBUG_INDEX_GROUP_INDEX]
+		if len(debugCmd.DebugData) > DEBUG_FREE_GROUP_INDEX && 0 <= debugCmd.DebugData[DEBUG_FREE_GROUP_INDEX] && debugCmd.DebugData[DEBUG_FREE_GROUP_INDEX] < len(MGReelGroup[rtp]) {
+			groupIdx = debugCmd.DebugData[DEBUG_FREE_GROUP_INDEX]
 		}
-		if len(debugCmd.DebugData) > DEBUG_INDEX_REEL_INDEX_06 {
-			debugReelIndex = debugCmd.DebugData[DEBUG_INDEX_REEL_INDEX_01 : DEBUG_INDEX_REEL_INDEX_06+1]
+		if len(debugCmd.DebugData) > DEBUG_FREE_REEL_INDEX_06 {
+			debugReelIndex = debugCmd.DebugData[DEBUG_FREE_REEL_INDEX_01 : DEBUG_FREE_REEL_INDEX_06+1]
 		}
 	}
 
@@ -975,6 +1040,15 @@ func (slot *SlotProb) RandFGSymbol(rtp int, buyType int, lineBet int, spinResult
 	if groupIdx == FREE_GAME_04 {
 		// 全盘替代
 		replaceSymbol = RandChoiceByWeight(MysteryList, MysteryGloballWT)
+		if debugCmd != nil {
+			// 调试控制神秘符号替换
+			if len(debugCmd.DebugData) > DEBUG_MY_SYMBOL_INDEX {
+				symbolIndex := debugCmd.DebugData[DEBUG_MY_SYMBOL_INDEX]
+				if symbolIndex >= 0 && symbolIndex < len(MysteryList) {
+					replaceSymbol = MysteryList[symbolIndex]
+				}
+			}
+		}
 	}
 
 	// 產出盤面
@@ -993,6 +1067,15 @@ func (slot *SlotProb) RandFGSymbol(rtp int, buyType int, lineBet int, spinResult
 		if groupIdx == FREE_GAME_01 || groupIdx == FREE_GAME_02 {
 			// 按列替代
 			replaceSymbol = RandChoiceByWeight(MysteryList, MysteryColWT)
+			if debugCmd != nil {
+				// 调试控制神秘符号替换
+				if len(debugCmd.DebugData) > DEBUG_MY_SYMBOL_INDEX {
+					symbolIndex := debugCmd.DebugData[DEBUG_MY_SYMBOL_INDEX]
+					if symbolIndex >= 0 && symbolIndex < len(MysteryList) {
+						replaceSymbol = MysteryList[symbolIndex]
+					}
+				}
+			}
 		}
 		columnSymbol := make(ReelSymbol, SLOT_ROW)
 		for row := range SLOT_ROW {
@@ -1187,7 +1270,7 @@ func (slot *SlotProb) CheckLine(wwMultiplier int, lineSymbol []Symbol) (symbol S
 }
 
 // ShowGameSymbol 顯示獎圖盤面
-func ShowGameSymbol(file *os.File, gameSymbol GameSymbol) {
+func ShowGameSymbol(gameSymbol GameSymbol) {
 	if gameSymbol == nil {
 		fmt.Println("ShowGameSymbol: GameSymbol is nil.")
 		return
@@ -1197,7 +1280,7 @@ func ShowGameSymbol(file *os.File, gameSymbol GameSymbol) {
 		for col := range SLOT_COL {
 			lineSymbol[col] = gameSymbol[col][row]
 		}
-		fmt.Fprintln(file, lineSymbol)
+		fmt.Println(lineSymbol)
 	}
-	fmt.Fprintln(file, "")
+	fmt.Println("")
 }

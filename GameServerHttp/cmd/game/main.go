@@ -1,8 +1,8 @@
 package main
 
 import (
-	"SlotGameServer/pkgs/controller"
-	"SlotGameServer/pkgs/service"
+	controller_game "SlotGameServer/pkgs/controller/game"
+	service_game "SlotGameServer/pkgs/service/game"
 	"SlotGameServer/utils"
 	utils_middleware "SlotGameServer/utils/middleware"
 	"context"
@@ -112,44 +112,37 @@ func setupRouter() (*gin.Engine, func()) {
 		r.Use(utils_middleware.TracerMiddleware())
 	}
 
-	tmpGameService := &service.GameService{}
+	tmpGameService := &service_game.GameService{}
 	tmpGameService.CheckInitialization()
 
 	// API v1 路由组
 	v1 := r.Group("/v1")
 	{
 		//游戏
-		gameController := controller.NewGameController(tmpGameService)
-		gameNoAuth := v1.Group("/game")
+		gameController := controller_game.NewGameController(tmpGameService)
+		gameAuth := v1.Group("/game", utils_middleware.ForceAuthMiddleware())
 		{
-			gameNoAuth.POST("/new", gameController.GameNew)
-			gameNoAuth.POST("/join", gameController.GameJoin)
-			gameNoAuth.POST("/info", gameController.GameInfo)
-			gameNoAuth.POST("/rtp/get", gameController.GameRtpGet)
+			// game
+			gameAuth.GET("/list", gameController.GameList)
+			gameAuth.GET("/info/:name", gameController.GameInfo)
+
+			// arcade
+			arcadeAuth := gameAuth.Group("/arcade")
+			{
+				arcadeAuth.POST("/join", gameController.ArcadeJoin)
+				arcadeAuth.GET("/history", gameController.ArcadeHistory)
+				arcadeAuth.POST("/refresh", gameController.ArcadeRefresh)
+				arcadeAuth.POST("/bet", gameController.ArcadeBet)
+				arcadeAuth.POST("/result", gameController.ArcadeResult)
+			}
+
+			// slot
+			// slotAuth := gameAuth.Group("/slot")
+			// {
+
+			// }
 		}
-		// slot
-		slotAuth := v1.Group("/slot", utils_middleware.ForceAuthMiddleware())
-		{
-			slotAuth.POST("/bet/get", gameController.SlotBetGet)
-			slotAuth.POST("/bet/set", gameController.SlotBetSet)
-			slotAuth.POST("/sel/get", gameController.SlotSelGet)
-			slotAuth.POST("/sel/set", gameController.SlotSelSet)
-			slotAuth.POST("/mode/set", gameController.SlotModeSet)
-			slotAuth.POST("/spin", gameController.SlotSpin)
-			slotAuth.POST("/doubleup", gameController.SlotDoubleup)
-			slotAuth.POST("/collect", gameController.SlotCollect)
-		}
-		// keno
-		// kenoAuth := v1.Group("/keno", utils_middleware.ForceAuthMiddleware())
-		// {
-		// 	kenoAuth.POST("/bet/get", gameController.KenoBetGet)
-		// 	kenoAuth.POST("/bet/set", gameController.KenoBetSet)
-		// 	kenoAuth.POST("/sel/get", gameController.KenoSelGet)
-		// 	kenoAuth.POST("/sel/set", gameController.KenoSelSet)
-		// 	kenoAuth.POST("/sel/getslice", gameController.KenoSelGetSlice)
-		// 	kenoAuth.POST("/sel/setslice", gameController.KenoSelSetSlice)
-		// 	kenoAuth.POST("/spin", gameController.KenoSpin)
-		// }
+
 	}
 
 	// 定义清理函数

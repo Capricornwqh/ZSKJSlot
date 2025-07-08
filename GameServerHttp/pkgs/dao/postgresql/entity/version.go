@@ -1,4 +1,4 @@
-package pgsql_entity
+package entity_pgsql
 
 // 版本表
 type Version struct {

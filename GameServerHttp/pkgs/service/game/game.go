@@ -1,8 +1,9 @@
-package service
+package service_game
 
 import (
 	"reflect"
 
+	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 
@@ -20,4 +21,9 @@ func (s *GameService) CheckInitialization() {
 			logrus.Fatalf("%s field %s is not initialized", t.Name(), t.Field(i).Name)
 		}
 	}
+}
+
+// 游戏列表
+func (s *GameService) GameList(ctx *gin.Context) {
+
 }

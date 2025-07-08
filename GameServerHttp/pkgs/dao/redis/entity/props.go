@@ -1,4 +1,4 @@
-package redis_entity
+package entity_redis
 
 const (
 	RedisProps       = "props"  // 用户在特定俱乐部的属性

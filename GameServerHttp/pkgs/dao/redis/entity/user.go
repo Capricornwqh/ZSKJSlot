@@ -1,4 +1,4 @@
-package redis_entity
+package entity_redis
 
 const TimeUserBase = 3 * 24 * 60 * 60 //用户基本信息过期时间（秒）
 

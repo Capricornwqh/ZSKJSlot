@@ -1,4 +1,4 @@
-package pgsql_service
+package service_pgsql
 
 import (
 	"github.com/gin-gonic/gin"
@@ -61,16 +61,16 @@ func GetMigrations() []Migration {
 // GetCurrentDBVersion returns the current db version
 // func GetCurrentDBVersion(db *gorm.DB) (int64, error) {
 // 	// 确保版本表存在
-// 	if err := db.AutoMigrate(&pgsql_entity.Version{}); err != nil {
+// 	if err := db.AutoMigrate(&entity_pgsql.Version{}); err != nil {
 // 		return -1, fmt.Errorf("sync version failed: %v", err)
 // 	}
 
-// 	var currentVersion pgsql_entity.Version
+// 	var currentVersion entity_pgsql.Version
 // 	result := db.First(&currentVersion, 1) // 查找 ID = 1 的记录
 // 	if result.Error != nil {
 // 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 // 			// 如果记录不存在，创建新记录
-// 			newVersion := pgsql_entity.Version{Id: 1, VersionNumber: 0}
+// 			newVersion := entity_pgsql.Version{Id: 1, VersionNumber: 0}
 // 			if err := db.Create(&newVersion).Error; err != nil {
 // 				return -1, fmt.Errorf("insert first version failed: %v", err)
 // 			}
@@ -129,7 +129,7 @@ func ExpectedVersion() int64 {
 // 			}
 // 		}
 // 		fmt.Printf("[migrate] migrate to db version %d success\n", currentDBVersion+1)
-// 		if _, err := engine.Update(&pgsql_entity.Version{Id: 1, VersionNumber: currentDBVersion + 1}); err != nil {
+// 		if _, err := engine.Update(&entity_pgsql.Version{Id: 1, VersionNumber: currentDBVersion + 1}); err != nil {
 // 			fmt.Printf("[migrate] migrate to db version %d, update failed: %s", currentDBVersion+1, err)
 // 			return err
 // 		}

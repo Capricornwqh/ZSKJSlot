@@ -1,4 +1,4 @@
-package pgsql_repo
+package repo_pgsql
 
 import (
 	"gorm.io/gorm"
