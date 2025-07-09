@@ -193,67 +193,14 @@ func (slot *SlotProb) Run(rtp int, lineBet int, result *SlotResult, debugCmdList
 			}
 
 			// 天降横财
-			tmpValue := rand.IntN(100)
 			endValue := -1
-			switch result.BuyType {
-			case Common.BUY_NONE:
-				switch result.FGIndex {
-				case FREE_INDEX_1:
-					if result.WWLevel == 1 {
-						endValue = FEATURE_BUY_NONE_LEVEL1_1
-					} else if result.WWLevel == 2 {
-						endValue = FEATURE_BUY_NONE_LEVEL2_1
-					}
-				case FREE_INDEX_2:
-					if result.WWLevel == 1 {
-						endValue = FEATURE_BUY_NONE_LEVEL1_2
-					} else if result.WWLevel == 2 {
-						endValue = FEATURE_BUY_NONE_LEVEL2_2
-					}
-				default:
-				}
-			case Common.BUY_FREE_SPINS:
-				switch result.FGIndex {
-				case FREE_INDEX_1:
-					if result.WWLevel == 1 {
-						endValue = FEATURE_BUY_FREE_LEVEL1_1
-					} else if result.WWLevel == 2 {
-						endValue = FEATURE_BUY_FREE_LEVEL2_1
-					} else if result.WWLevel == 3 {
-						endValue = FEATURE_BUY_FREE_LEVEL3_1
-					}
-				case FREE_INDEX_2:
-					if result.WWLevel == 1 {
-						endValue = FEATURE_BUY_FREE_LEVEL1_2
-					} else if result.WWLevel == 2 {
-						endValue = FEATURE_BUY_FREE_LEVEL2_2
-					}
-				default:
-				}
-			case Common.BUY_SUPER_FREE_SPINS:
-				switch result.FGIndex {
-				case FREE_INDEX_1:
-					if result.WWLevel == 2 {
-						endValue = FEATURE_BUY_SUPER_LEVEL2_1
-					} else if result.WWLevel == 3 {
-						endValue = FEATURE_BUY_SUPER_LEVEL3_1
-					} else if result.WWLevel == 4 {
-						endValue = FEATURE_BUY_SUPER_LEVEL4_1
-					}
-				case FREE_INDEX_2:
-					if result.WWLevel == 2 {
-						endValue = FEATURE_BUY_SUPER_LEVEL2_2
-					} else if result.WWLevel == 3 {
-						endValue = FEATURE_BUY_SUPER_LEVEL3_2
-					} else if result.WWLevel == 4 {
-						endValue = FEATURE_BUY_SUPER_LEVEL4_2
-					}
-				default:
-				}
-			default:
+			if result.BuyType >= 0 && result.BuyType < len(FeatureEndValueMap) &&
+				result.FGIndex >= 0 && result.FGIndex < len(FeatureEndValueMap[result.BuyType]) &&
+				result.WWLevel >= 0 && result.WWLevel < len(FeatureEndValueMap[result.BuyType][result.FGIndex]) {
+				endValue = FeatureEndValueMap[result.BuyType][result.FGIndex][result.WWLevel]
 			}
 
-			if requiredSSCount <= 2 && endValue > 0 && tmpValue < endValue {
+			if requiredSSCount <= 2 && endValue > 0 && rand.IntN(100) < endValue {
 				result.FGFeatureCount++
 				tumbleSymbol := make(GameSymbol, len(result.FGSpinList[len(result.FGSpinList)-1].TumbleSymbol))
 				for i, v := range result.FGSpinList[len(result.FGSpinList)-1].TumbleSymbol {
@@ -533,7 +480,7 @@ func moveTo(toad []*WildStruct, target *WildStruct) []*WildStruct {
 			d := abs(topLeft.WildCoordinate[0]-tlx) + abs(topLeft.WildCoordinate[1]-tly)
 			if d < minDist {
 				minDist = d
-				newTopLeft = WildStruct{WildSymbol: 0, WildCoordinate: [2]int{tlx, tly}}
+				newTopLeft = WildStruct{WildCoordinate: [2]int{tlx, tly}}
 			}
 		}
 	}
@@ -639,17 +586,19 @@ func (slot *SlotProb) expandFrog(wwStuct []*WildStruct, level int) []*WildStruct
 			break
 		}
 
-		if dir.name == "right" {
+		switch dir.name {
+		case "right":
 			// 向右扩展
 			expand := min(expandWidth-horizontalExpanded, dir.space)
 			horizontalExpanded += expand
-		} else if dir.name == "left" {
+		case "left":
 			// 向左扩展
 			expand := min(expandWidth-horizontalExpanded, dir.space)
 			if expand > 0 {
 				newX = minX - expand
 				horizontalExpanded += expand
 			}
+		default:
 		}
 	}
 
@@ -660,17 +609,19 @@ func (slot *SlotProb) expandFrog(wwStuct []*WildStruct, level int) []*WildStruct
 			break
 		}
 
-		if dir.name == "top" {
+		switch dir.name {
+		case "top":
 			// 向上扩展
 			expand := min(expandHeight-verticalExpanded, dir.space)
 			if expand > 0 {
 				newY = minY - expand
 				verticalExpanded += expand
 			}
-		} else if dir.name == "bottom" {
+		case "bottom":
 			// 向下扩展
 			expand := min(expandHeight-verticalExpanded, dir.space)
 			verticalExpanded += expand
+		default:
 		}
 	}
 
@@ -919,10 +870,12 @@ func (slot *SlotProb) RandMGSymbol(rtp int, buyType int, lineBet int, tumbleResu
 
 	for col := range SLOT_COL {
 		for row := range SLOT_ROW {
-			if tumbleResult.TumbleSymbol[col][row] == WW {
+			switch tumbleResult.TumbleSymbol[col][row] {
+			case WW:
 				tmpWWWild = append(tmpWWWild, &WildStruct{WildSymbol: WW, WildCoordinate: [2]int{col, row}})
-			} else if tumbleResult.TumbleSymbol[col][row] == SS {
+			case SS:
 				tmpSSWild = append(tmpSSWild, &WildStruct{WildSymbol: SS, WildCoordinate: [2]int{col, row}})
+			default:
 			}
 		}
 	}

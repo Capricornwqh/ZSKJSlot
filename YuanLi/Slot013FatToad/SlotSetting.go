@@ -432,3 +432,30 @@ var FGLevelGroupIndexWT = [][2][7][]uint{
 		},
 	},
 }
+
+// 结束值映射
+var FeatureEndValueMap = [4][2][7]int{
+	// Common.BUY_NONE
+	{
+		// FREE_INDEX_1
+		{0, 50, 50, 0, 0, 0, 0},
+		// FREE_INDEX_2
+		{0, 60, 30, 0, 0, 0, 0},
+	},
+	// Common.BUY_EXTRA_BET
+	{},
+	// Common.BUY_FREE_SPINS
+	{
+		// FREE_INDEX_1
+		{0, 70, 20, 10, 0, 0, 0},
+		// FREE_INDEX_2
+		{0, 50, 20, 0, 0, 0, 0},
+	},
+	// Common.BUY_SUPER_FREE_SPINS
+	{
+		// FREE_INDEX_1
+		{0, 0, 30, 20, 20, 0, 0},
+		// FREE_INDEX_2
+		{0, 0, 30, 20, 10, 0, 0},
+	},
+}

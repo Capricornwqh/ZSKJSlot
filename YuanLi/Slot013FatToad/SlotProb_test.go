@@ -311,7 +311,7 @@ func TestExpandFrog(t *testing.T) {
 
 // TestFGReelGroup 测试免费游戏轮带盘面
 func (slot *SlotProb) TestFGReelGroup(rtp, groupIdx int, reelIndices []int) {
-	if reelIndices == nil || len(reelIndices) < SLOT_COL {
+	if len(reelIndices) < SLOT_COL {
 		fmt.Println("无效的reelIndices参数，请提供", SLOT_COL, "个索引值")
 		return
 	}
