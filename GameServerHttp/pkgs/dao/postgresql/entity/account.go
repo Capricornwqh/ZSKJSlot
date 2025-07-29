@@ -1,6 +1,7 @@
 package entity_pgsql
 
 import (
+	"strconv"
 	"time"
 )
 
@@ -19,6 +20,14 @@ const (
 	UFdeleted                  // 用户已删除
 )
 
+func (u UF) MarshalBinary() ([]byte, error) {
+	return []byte(strconv.FormatUint(uint64(u), 10)), nil
+}
+
+func (u UF) MarshalText() ([]byte, error) {
+	return u.MarshalBinary()
+}
+
 // 用户访问权限
 type AL uint
 
@@ -31,20 +40,26 @@ const (
 	ALall    = ALmember | ALdealer | ALbooker | ALmaster | ALadmin
 )
 
-const (
-	USER_ADMIN = 1
-)
+func (a AL) MarshalBinary() ([]byte, error) {
+	return []byte(strconv.FormatUint(uint64(a), 10)), nil
+}
+
+func (a AL) MarshalText() ([]byte, error) {
+	return a.MarshalBinary()
+}
 
 // 用户表
-type User struct {
-	UId           uint64    `gorm:"column:uId;type:bigserial;primaryKey;not null;comment:主键ID;" redis:"uId" json:"uId"`
+type Account struct {
+	Id            uint64    `gorm:"column:id;type:bigserial;primaryKey;not null;comment:主键ID;" redis:"id" json:"id"`
+	PlatformId    string    `gorm:"column:platformId;type:varchar(100);not null;default:'';comment:平台ID;" redis:"platformId" json:"platformId"`
+	PlatformType  string    `gorm:"column:platformType;type:varchar(50);not null;default:'';comment:平台类型;" redis:"platformType" json:"platformType"`
 	CreatedAt     time.Time `gorm:"column:createdAt;type:timestamptz;not null;default:CURRENT_TIMESTAMP;comment:创建时间;" redis:"createdAt" json:"createdAt"`
 	UpdatedAt     time.Time `gorm:"column:updatedAt;type:timestamptz;not null;default:CURRENT_TIMESTAMP;comment:修改时间;" redis:"updatedAt" json:"updatedAt"`
 	DeletedAt     time.Time `gorm:"column:deletedAt;type:timestamptz;not null;default:CURRENT_TIMESTAMP;comment:删除时间;" redis:"deletedAt" json:"deletedAt"`
 	LastLoginDate time.Time `gorm:"column:lastLoginDate;type:timestamptz;not null;default:CURRENT_TIMESTAMP;comment:最后登录时间;" redis:"lastLoginDate" json:"lastLoginDate"`
 	Username      string    `gorm:"column:username;type:varchar(50);not null;default:'';comment:用户名;" redis:"username" json:"username"`
 	Pass          string    `gorm:"column:pass;type:varchar(255);not null;default:'';comment:密码;" redis:"pass" json:"pass"`
-	EMail         string    `gorm:"column:email;type:varchar(100);not null;default:'';comment:邮箱;" redis:"email" json:"email"`
+	Email         string    `gorm:"column:email;type:varchar(100);not null;default:'';comment:邮箱;" redis:"email" json:"email"`
 	Rank          int32     `gorm:"column:rank;type:int;not null;default:0;comment:排名;" redis:"rank" json:"rank"`
 	Gender        int32     `gorm:"column:gender;type:smallint;not null;default:0;comment:性别 0-保密 1-男 2-女;" redis:"gender" json:"gender"`
 	IsAdmin       int32     `gorm:"column:isAdmin;type:smallint;not null;default:0;comment:是否管理员(0-非管理员, 1-管理员);" redis:"isAdmin" json:"isAdmin"`
@@ -62,11 +77,16 @@ type User struct {
 }
 
 // 表名
-func (User) TableName() string {
-	return "user"
+func (Account) TableName() string {
+	return "account"
 }
 
 // 表注释
-func (User) Comment() string {
-	return "用户表"
+func (Account) Comment() string {
+	return "账号表"
+}
+
+// 设置accountId的起始值
+func (Account) SetAccountIdStartValue() string {
+	return "ALTER SEQUENCE account_id_seq RESTART WITH 10000000;"
 }

@@ -1,10 +1,10 @@
-# 玩家服务
+# 第三方服务
 # dev prod
 environment: dev
 
 # server configuration
 server:
-  type: "user"
+  type: "third"
   domain: ":11000"
 
 # Configuration for geo
@@ -61,7 +61,7 @@ logging:
 tracing:
   enabled: true
   otlp:
-    serviceName: "192.168.1.5-slot-game"
+    serviceName: "localhost-slot-game"
     endpoint: "192.168.1.16:4317"
     insecure: true
     samplingRatio: 1.0

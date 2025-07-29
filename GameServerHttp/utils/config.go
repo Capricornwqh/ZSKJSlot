@@ -37,7 +37,7 @@ type Config struct {
 	GeoDB       string       `yaml:"geodb"`
 	Email       Email        `yaml:"email"`
 	I18N        I18N         `yaml:"i18n"`
-	PostgreSQL  PostgreSQL   `yaml:"postgresql"`
+	PostgreSQL  PostgreSQLS  `yaml:"postgresql"`
 	Redis       Redis        `yaml:"redis"`
 	Tracing     Tracing      `yaml:"tracing"`
 	Logging     []LogrusHook `yaml:"logging"`
@@ -70,6 +70,12 @@ type Email struct {
 	Password string `yaml:"password"`
 	From     string `yaml:"from"`
 	Port     int    `yaml:"port"`
+}
+
+// PostgreSQL配置
+type PostgreSQLS struct {
+	Game PostgreSQL `yaml:"game"`
+	Log  PostgreSQL `yaml:"log"`
 }
 
 // PostgreSQL配置

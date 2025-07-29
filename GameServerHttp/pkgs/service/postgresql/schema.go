@@ -2,7 +2,6 @@ package service_pgsql
 
 import (
 	entity_pgsql "SlotGameServer/pkgs/dao/postgresql/entity"
-	"SlotGameServer/utils"
 	"context"
 	"fmt"
 	"time"
@@ -20,7 +19,7 @@ type PGSQLService struct {
 }
 
 // 初始化数据表
-func (s *PGSQLService) InitDB(ctx context.Context) error {
+func (s *PGSQLService) ititDB(ctx context.Context) error {
 	s.ctx = ctx
 	s.do("check table exist", s.checkTableExist)
 	s.do("sync table", s.syncTable)
@@ -49,14 +48,20 @@ func (s *PGSQLService) checkTableExist() {
 func (s *PGSQLService) syncTable() {
 	// gorm的自动迁移方法
 	sliceTables := []any{
-		entity_pgsql.User{},
+		entity_pgsql.Account{},
+		entity_pgsql.Version{},
 	}
 	for _, table := range sliceTables {
 		var tableOptions string
 		var tableName string
+		var sqlString string
 		// 根据不同表类型设置对应的comment
 		switch v := table.(type) {
-		case entity_pgsql.User:
+		case entity_pgsql.Account:
+			tableOptions = v.Comment()
+			tableName = v.TableName()
+			sqlString = v.SetAccountIdStartValue()
+		case entity_pgsql.Version:
 			tableOptions = v.Comment()
 			tableName = v.TableName()
 		default:
@@ -67,6 +72,9 @@ func (s *PGSQLService) syncTable() {
 		if tableOptions != "" {
 			s.DB.Exec(fmt.Sprintf("COMMENT ON TABLE %s IS '%s';", tableName, tableOptions))
 		}
+		if sqlString != "" {
+			s.DB.Exec(sqlString)
+		}
 
 		if s.err != nil {
 			return
@@ -75,25 +83,21 @@ func (s *PGSQLService) syncTable() {
 }
 
 // 定时器
-func startScheduler() *gocron.Scheduler {
+func (s *PGSQLService) StartScheduler() *gocron.Scheduler {
 	ctx := context.Background()
-	//tables
-	tmpSchemaService := PGSQLService{
-		DB: utils.PostgreSQLDB,
-	}
-	err := tmpSchemaService.InitDB(ctx)
+	err := s.ititDB(ctx)
 	if err != nil {
 		logrus.Panic(err)
 	}
 
 	scheduler := gocron.NewScheduler(time.UTC)
-	// 添加Revision表的定时任务
-	tmpSchemaService.MigrateRevision(ctx)
-	nextYear := time.Now().AddDate(1, 0, 0) // 下一年的同一天
-	startTime := time.Date(nextYear.Year(), nextYear.Month(), nextYear.Day(), 0, 0, 0, 0, time.Local)
-	scheduler.Every(1).StartAt(startTime).SingletonMode().Do(func() {
-		tmpSchemaService.MigrateRevision(ctx)
-	})
+	// // 添加Revision表的定时任务
+	// tmpSchemaService.MigrateRevision(ctx)
+	// nextYear := time.Now().AddDate(1, 0, 0) // 下一年的同一天
+	// startTime := time.Date(nextYear.Year(), nextYear.Month(), nextYear.Day(), 0, 0, 0, 0, time.Local)
+	// scheduler.Every(1).StartAt(startTime).SingletonMode().Do(func() {
+	// 	tmpSchemaService.MigrateRevision(ctx)
+	// })
 
 	// 启动调度器
 	scheduler.StartAsync()
@@ -111,22 +115,22 @@ func (s *PGSQLService) initVersionTable() {
 
 // 创建Revision 每年生成下一年的表
 func (s *PGSQLService) MigrateRevision(ctx context.Context) error {
-	nowTime := time.Now()
-	tmpRecord := entity_pgsql.Record{}
+	// nowTime := time.Now()
+	// tmpRecord := entity_pgsql.Record{}
 
-	for i := range 2 {
-		tmpTableName := fmt.Sprintf("record_%d", nowTime.Year()+i)
-		if !s.DB.Migrator().HasTable(tmpTableName) {
-			err := s.DB.Table(tmpTableName).Migrator().CreateTable(tmpRecord)
-			if err != nil {
-				logrus.WithContext(ctx).Error(err)
-				return err
-			}
-			if tmpRecord.Comment() != "" {
-				s.DB.Exec(fmt.Sprintf("COMMENT ON TABLE %s IS '%s';", tmpTableName, tmpRecord.Comment()))
-			}
-		}
-	}
+	// for i := range 2 {
+	// 	tmpTableName := fmt.Sprintf("record_%d", nowTime.Year()+i)
+	// 	if !s.DB.Migrator().HasTable(tmpTableName) {
+	// 		err := s.DB.Table(tmpTableName).Migrator().CreateTable(tmpRecord)
+	// 		if err != nil {
+	// 			logrus.WithContext(ctx).Error(err)
+	// 			return err
+	// 		}
+	// 		if tmpRecord.Comment() != "" {
+	// 			s.DB.Exec(fmt.Sprintf("COMMENT ON TABLE %s IS '%s';", tmpTableName, tmpRecord.Comment()))
+	// 		}
+	// 	}
+	// }
 
 	return nil
 }

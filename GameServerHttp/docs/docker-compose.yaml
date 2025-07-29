@@ -3,14 +3,14 @@ services:
     image: elasticsearch:8.18.2
     container_name: elasticsearch
     ports:
-      - 19200:9200
-      - 19300:9300
+      - 9200:9200
+      - 9300:9300
     environment:
       TZ: Asia/Shanghai
       LANG: C.UTF-8
       LC_ALL: C.UTF-8
       xpack.security.enabled: false
-      ELASTIC_PASSWORD: fouL*X0n^CH8
+      ELASTIC_PASSWORD: bX@Ro*Lc9#T
       discovery.type: single-node
       ingest.geoip.downloader.enabled: false
       bootstrap.memory_lock: true
@@ -31,15 +31,15 @@ services:
     container_name: jaeger
     ports:
       - 16686:16686
-      - 14317:4317
-      - 14318:4318
+      - 4317:4317
+      - 4318:4318
     environment:
       LOG_LEVEL: debug
       TZ: Asia/Shanghai
       SPAN_STORAGE_TYPE: elasticsearch
-      ES_SERVER_URLS: http://es:19200
+      ES_SERVER_URLS: http://es:9200
       ES_USERNAME: elastic
-      ES_PASSWORD: fouL*X0n^CH8
+      ES_PASSWORD: bX@Ro*Lc9#T
     # healthcheck:
     #   test: ["CMD", "curl", "localhost:13133/status"]
     #   interval: 10s
@@ -56,29 +56,29 @@ services:
     container_name: redis
     environment:
       - TZ=Asia/Shanghai
-    command: redis-server --requirepass W*5rE#8l7
+    command: redis-server --requirepass L3oTp#9X@Fc
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a W*5rE#8l7", "--raw", "incr", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a L3oTp#9X@Fc", "--raw", "incr", "ping"]
       interval: 1s
       timeout: 3s
       retries: 5
     ports:
-      - 16379:6379
+      - 6379:6379
 
   postgres:
     image: postgres:16-alpine
     ports:
-      - "15432:5432"
+      - "5432:5432"
     container_name: postgresql
     # volumes:
     #   - /home/wqh/components/postgresql/data:/var/lib/postgresql/data
     environment:
       - TZ=Asia/Shanghai
-      - POSTGRES_PASSWORD=P3g5R$1*b7
-      - POSTGRES_USER=heibai
-      - POSTGRES_DB=slotgame
+      - POSTGRES_PASSWORD=X!cWo93#pLQ
+      - POSTGRES_USER=jskj
+      - POSTGRES_DB=slot_game
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U heibai -d slotgame"]
+      test: ["CMD-SHELL", "pg_isready -U jskj -d slot_game"]
       interval: 5s
       timeout: 5s
       retries: 5

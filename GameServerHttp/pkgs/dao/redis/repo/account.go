@@ -17,9 +17,9 @@ type userBaseRedisRepo struct {
 
 type UserRedisRepo interface {
 	// 保存用户
-	SetUser(ctx *gin.Context, userBase *entity_pgsql.User, expiration time.Duration) error
+	SetUser(ctx *gin.Context, userBase *entity_pgsql.Account, expiration time.Duration) error
 	// 获取用户
-	GetUser(ctx *gin.Context, userId uint64) (*entity_pgsql.User, error)
+	GetUser(ctx *gin.Context, userId uint64) (*entity_pgsql.Account, error)
 	// 获取Field
 	GetUserField(ctx *gin.Context, userId uint64, field string) (string, error)
 }
@@ -31,12 +31,12 @@ func NewUserRedisRepo(redisClient *redis.Client) UserRedisRepo {
 }
 
 // 保存用户
-func (r *userBaseRedisRepo) SetUser(ctx *gin.Context, userBase *entity_pgsql.User, expiration time.Duration) error {
-	if r.redisClient == nil || userBase == nil || userBase.UId <= 0 {
+func (r *userBaseRedisRepo) SetUser(ctx *gin.Context, userBase *entity_pgsql.Account, expiration time.Duration) error {
+	if r.redisClient == nil || userBase == nil || userBase.Id <= 0 {
 		return utils.ErrParameter
 	}
 
-	key := fmt.Sprintf("%s:%d", entity_redis.RedisUser, userBase.UId)
+	key := fmt.Sprintf("%s:%d", entity_redis.RedisUser, userBase.Id)
 	err := r.redisClient.HSet(ctx, key, userBase).Err()
 	if err != nil {
 		return err
@@ -50,19 +50,19 @@ func (r *userBaseRedisRepo) SetUser(ctx *gin.Context, userBase *entity_pgsql.Use
 }
 
 // 获取用户
-func (r *userBaseRedisRepo) GetUser(ctx *gin.Context, userId uint64) (*entity_pgsql.User, error) {
+func (r *userBaseRedisRepo) GetUser(ctx *gin.Context, userId uint64) (*entity_pgsql.Account, error) {
 	if r.redisClient == nil || userId <= 0 {
 		return nil, utils.ErrParameter
 	}
 
-	tmpUser := &entity_pgsql.User{}
+	tmpUser := &entity_pgsql.Account{}
 	err := r.redisClient.HGetAll(ctx, fmt.Sprintf("%s:%d", entity_redis.RedisUser, userId)).Scan(tmpUser)
 	if err != nil {
 		if err == redis.Nil {
 			return nil, utils.ErrRedisNotKey
 		}
 	}
-	if tmpUser.UId <= 0 {
+	if tmpUser.Id <= 0 {
 		return nil, utils.ErrRedisNotKey
 	}
 	return tmpUser, nil

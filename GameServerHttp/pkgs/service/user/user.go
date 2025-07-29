@@ -38,7 +38,7 @@ func (s *UserService) CheckInitialization() {
 }
 
 // 获取用户的redis数据
-func (s *UserService) GetUser(ctx *gin.Context) (*entity_pgsql.User, error) {
+func (s *UserService) GetUser(ctx *gin.Context) (*entity_pgsql.Account, error) {
 	tmpUserId := ctx.GetUint64(utils_middleware.CONTEXT_USERID)
 	if tmpUserId <= 0 {
 		return nil, utils.ErrUserNotFound
@@ -148,12 +148,12 @@ func (s *UserService) EmailSignUp(ctx *gin.Context, req *model.UserSignRequest) 
 		logrus.WithContext(ctx).Error(err)
 		return nil, utils.ErrOperation
 	}
-	tmpUser = &entity_pgsql.User{
+	tmpUser = &entity_pgsql.Account{
 		DeletedAt:     nowTime,
 		CreatedAt:     nowTime,
 		UpdatedAt:     nowTime,
 		LastLoginDate: nowTime,
-		EMail:         req.Object,
+		Email:         req.Object,
 		Username:      req.Username,
 		Status:        entity_pgsql.UFactivated,
 		Pass:          tmpPassword,
@@ -172,7 +172,7 @@ func (s *UserService) EmailSignUp(ctx *gin.Context, req *model.UserSignRequest) 
 		return nil, utils.ErrOperation
 	}
 
-	tmpToken, err := utils_middleware.GenerateToken(tmpUser.UId, nowTime)
+	tmpToken, err := utils_middleware.GenerateToken(tmpUser.Id, nowTime)
 	if err != nil {
 		logrus.WithContext(ctx).Error(err)
 		return nil, utils.ErrToken
@@ -186,11 +186,11 @@ func (s *UserService) EmailSignUp(ctx *gin.Context, req *model.UserSignRequest) 
 	}
 
 	tmpUserLoginResponse := &model.UserBaseInfo{
-		UserId:        tmpUser.UId,
+		UserId:        tmpUser.Id,
 		CreatedAt:     tmpUser.CreatedAt,
 		LastLoginDate: tmpUser.LastLoginDate,
 		Username:      tmpUser.Username,
-		EMail:         tmpUser.EMail,
+		EMail:         tmpUser.Email,
 		Pass:          tmpUser.Pass,
 		Avatar:        tmpUser.Avatar,
 		Mobile:        tmpUser.Mobile,
@@ -248,7 +248,7 @@ func (s *UserService) EmailSignIn(ctx *gin.Context, req *model.UserSignRequest) 
 		return nil, utils.ErrOperation
 	}
 
-	tmpToken, err := utils_middleware.GenerateToken(tmpUser.UId, nowTime)
+	tmpToken, err := utils_middleware.GenerateToken(tmpUser.Id, nowTime)
 	if err != nil {
 		logrus.WithContext(ctx).Error(err)
 		return nil, utils.ErrToken
@@ -262,11 +262,11 @@ func (s *UserService) EmailSignIn(ctx *gin.Context, req *model.UserSignRequest) 
 	}
 
 	tmpUserLoginResponse := &model.UserBaseInfo{
-		UserId:        tmpUser.UId,
+		UserId:        tmpUser.Id,
 		CreatedAt:     tmpUser.CreatedAt,
 		LastLoginDate: tmpUser.LastLoginDate,
 		Username:      tmpUser.Username,
-		EMail:         tmpUser.EMail,
+		EMail:         tmpUser.Email,
 		Pass:          tmpUser.Pass,
 		Avatar:        tmpUser.Avatar,
 		Mobile:        tmpUser.Mobile,
@@ -328,7 +328,7 @@ func (s *UserService) AccountSignIn(ctx *gin.Context, req *model.UserSignRequest
 		}
 	}
 
-	tmpToken, err := utils_middleware.GenerateToken(tmpUser.UId, nowTime)
+	tmpToken, err := utils_middleware.GenerateToken(tmpUser.Id, nowTime)
 	if err != nil {
 		logrus.WithContext(ctx).Error(err)
 		return nil, utils.ErrToken
@@ -342,11 +342,11 @@ func (s *UserService) AccountSignIn(ctx *gin.Context, req *model.UserSignRequest
 	}
 
 	tmpUserLoginResponse := &model.UserBaseInfo{
-		UserId:        tmpUser.UId,
+		UserId:        tmpUser.Id,
 		CreatedAt:     tmpUser.CreatedAt,
 		LastLoginDate: tmpUser.LastLoginDate,
 		Username:      tmpUser.Username,
-		EMail:         tmpUser.EMail,
+		EMail:         tmpUser.Email,
 		Avatar:        tmpUser.Avatar,
 		Mobile:        tmpUser.Mobile,
 		Country:       tmpUser.Country,
@@ -370,11 +370,11 @@ func (s *UserService) GetProfile(ctx *gin.Context) (*model.UserBaseInfo, error) 
 	}
 
 	tmpUserBaseInfo := &model.UserBaseInfo{
-		UserId:        tmpUser.UId,
+		UserId:        tmpUser.Id,
 		CreatedAt:     tmpUser.CreatedAt,
 		LastLoginDate: tmpUser.LastLoginDate,
 		Username:      tmpUser.Username,
-		EMail:         tmpUser.EMail,
+		EMail:         tmpUser.Email,
 		Avatar:        tmpUser.Avatar,
 		Mobile:        tmpUser.Mobile,
 		Country:       tmpUser.Country,
